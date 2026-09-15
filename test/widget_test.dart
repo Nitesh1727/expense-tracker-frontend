@@ -1,30 +1,25 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:frontend/main.dart';
+import 'package:frontend/features/auth/presentation/phone_entry_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  // Deliberately pumps PhoneEntryScreen directly rather than the full
+  // ExpenseTrackerApp: the real entry point starts by reading a token from
+  // flutter_secure_storage, whose platform channel has no response in the
+  // widget-test binding (no device/simulator behind it) and hangs rather
+  // than erroring — a test-environment gap, not an app bug. Exercising the
+  // full AuthController flow would need a mocked secure-storage channel,
+  // which isn't worth the setup for what this test is checking.
+  testWidgets('Phone entry screen shows the phone field and continue button', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: PhoneEntryScreen())),
+    );
+    // pumpAndSettle rides out the entrance animations (flutter_animate) on
+    // this screen rather than leaving their tickers pending.
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Track your spending'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Continue'), findsOneWidget);
   });
 }

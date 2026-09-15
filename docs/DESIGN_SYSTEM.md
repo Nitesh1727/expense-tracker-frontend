@@ -26,13 +26,41 @@ and low-cost to do if tokens are used consistently from the start).
 | `border` | `#E5E7EB` | `#2A2A2A` | Dividers, input borders |
 | `error` | `#DC2626` | `#F87171` | Validation errors, delete actions |
 
-**Category colors** — each of the 7 fixed categories gets a distinct accent
-used for its chip/icon/chart segment, chosen for distinctness + accessible
-contrast, not literal meaning:
-`Food` amber, `Transport` blue, `Shopping` violet, `Bills` red-orange,
-`Entertainment` pink, `Health` teal, `Other` gray. Exact hex values to be
-finalized in `core/theme/colors.dart` alongside `core/constants/categories.dart`
-so each category's color lives next to its icon/label.
+**Category colors & icons** — categories are user-CRUD-able (see
+`backend/docs/DATABASE.md`), so color and icon are a *curated pick*, not a
+free picker — keeps every user's category list visually consistent instead
+of ending up with clashing custom colors. The create/edit category sheet
+shows a fixed swatch grid and a fixed icon grid; the user picks from each.
+
+Curated color palette (10 swatches, used for both category colors and chart
+segments):
+
+| Name | Hex |
+|------|-----|
+| amber | `#F59E0B` |
+| blue | `#3B82F6` |
+| violet | `#8B5CF6` |
+| red-orange | `#EF4444` |
+| pink | `#EC4899` |
+| teal | `#14B8A6` |
+| gray | `#6B7280` |
+| green | `#22C55E` |
+| indigo | `#6366F1` |
+| brown | `#92400E` |
+
+Curated icon set (Material icon keys — the app maps each key to an
+`IconData` in `core/constants/categories.dart`; the backend only ever stores
+the string key, never an icon asset):
+
+`restaurant`, `directions_car`, `shopping_bag`, `receipt_long`, `movie`,
+`favorite`, `category`, `home`, `flight`, `school`, `fitness_center`,
+`pets`, `local_grocery_store`, `sports_esports`, `local_hospital`, `coffee`.
+
+Default seeded categories (created for every new user at signup — see
+backend DATABASE.md) use the same icon/color values listed there: Food
+(amber/restaurant), Transport (blue/directions_car), Shopping
+(violet/shopping_bag), Bills (red-orange/receipt_long), Entertainment
+(pink/movie), Health (teal/favorite), Other (gray/category, not deletable).
 
 ## Typography
 
@@ -90,6 +118,21 @@ Rules of thumb:
   `standard`.
 - Never animate for animation's sake — if a transition doesn't help the user
   understand what changed, it's noise.
+
+## Navigation
+
+Bottom nav, 4 tabs — each a genuinely distinct destination, kept minimal on
+purpose:
+
+1. **Home** — today's total, quick-add entry point, recent expenses grouped
+   into `Today` / `Yesterday` / `Earlier this week` sections. "View all"
+   from here opens the full expense history/log screen (filters, edit,
+   delete) — that history list is a pushed route, not its own tab, since it's
+   a drill-down of Home rather than a separate concern.
+2. **Analytics** — period selector (Day/Week/Month/Year), total, pie/donut
+   chart by category, trend chart over the period.
+3. **Categories** — list of the user's categories with CRUD (add/edit/delete).
+4. **Profile** — account info, logout, delete account, CSV export action.
 
 ## Component notes
 

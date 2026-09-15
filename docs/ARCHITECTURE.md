@@ -30,8 +30,6 @@ frontend/lib/
 │   │   ├── typography.dart     # text style tokens
 │   │   ├── spacing.dart        # spacing scale constants
 │   │   └── motion.dart         # animation duration/curve tokens
-│   ├── router/
-│   │   └── app_router.dart     # go_router config, route definitions
 │   ├── network/
 │   │   ├── api_client.dart     # dio instance, base URL, JWT interceptor
 │   │   └── api_exception.dart
@@ -52,13 +50,17 @@ frontend/lib/
 │   ├── expenses/
 │   │   ├── data/
 │   │   ├── domain/                # Expense model
-│   │   └── presentation/          # list screen, add/edit sheet, expense card
+│   │   └── presentation/          # home screen, history/log screen, add/edit sheet, expense card
+│   ├── categories/
+│   │   ├── data/
+│   │   ├── domain/                # Category model
+│   │   └── presentation/          # category list + add/edit sheet (icon+color pickers)
 │   ├── analytics/
 │   │   ├── data/
 │   │   ├── domain/
-│   │   └── presentation/          # period filter tabs, charts (fl_chart)
+│   │   └── presentation/          # period filter tabs, pie + trend charts (fl_chart)
 │   └── export/
-│       └── presentation/          # export action + share sheet trigger
+│       └── presentation/          # export action + share sheet trigger, lives in Profile
 └── test/
 ```
 
@@ -72,7 +74,6 @@ folders.
 | Package | Purpose | Why this one |
 |---------|---------|---------------|
 | `flutter_riverpod` | State management | See above. |
-| `go_router` | Routing | Official, supports the animated transitions and deep-link structure a polished app needs. |
 | `dio` | HTTP client | Interceptor support for attaching the JWT and centralizing error handling, without needing code generation. |
 | `flutter_secure_storage` | JWT persistence | Keychain/Keystore-backed — plain `SharedPreferences` for an auth token is a bad practice both stores' reviewers can flag. |
 | `fl_chart` | Analytics charts | Lightweight, customizable, good animation support out of the box. |
@@ -91,6 +92,22 @@ Backend generates the CSV (`GET /api/export/csv`, see backend API docs) and
 the app writes the response to a temp file, then opens the native share sheet
 (`share_plus`) so the user can save to Files, Drive, email it, or open
 directly in Sheets. Client never needs raw storage-write permissions.
+
+## Navigation
+
+Plain `Navigator`/`MaterialPageRoute` and bottom-nav `IndexedStack` — no
+routing package. `go_router` was the original plan (see the dependency
+table above's history in git), but it was dropped during implementation:
+this app has no deep-linking requirement and only ever has two top-level
+states (signed out / signed in with 4 flat tabs), so `go_router`'s
+redirect-based auth gating adds a real class of timing bugs (redirect
+evaluated against a stale/loading auth state) for no payoff here. Instead:
+`lib/app.dart` holds an `AuthGate` that watches `authControllerProvider`
+and swaps between `PhoneEntryScreen` and `RootShell` inside an
+`AnimatedSwitcher` (so the swap still cross-fades instead of jumping); each
+tab in `RootShell` and every drill-down/sheet uses plain
+`Navigator.push`/`showModalBottomSheet`. Revisit only if the app grows
+screens that genuinely need URL-addressable deep links.
 
 ## Networking + auth
 
