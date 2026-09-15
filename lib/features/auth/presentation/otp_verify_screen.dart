@@ -37,8 +37,13 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
     setState(() => _verifying = true);
     try {
       await ref.read(authControllerProvider.notifier).verifyOtp(widget.phone, _codeController.text.trim());
-      // On success AuthController's state flips to AsyncData(user); the
-      // router redirects away from auth screens automatically (see app_router.dart).
+      // AuthController's state flips to AsyncData(user), which makes AuthGate
+      // (lib/app.dart) swap its content to RootShell — but this screen was
+      // reached via Navigator.push on top of AuthGate's content, so that swap
+      // happens invisibly underneath it. Pop explicitly to reveal it; found by
+      // actually running the app — the OTP screen was hanging silently after
+      // a real, successful login until this pop was added.
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Something went wrong';

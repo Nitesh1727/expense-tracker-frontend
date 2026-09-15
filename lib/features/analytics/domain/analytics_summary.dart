@@ -34,8 +34,17 @@ class TrendPoint {
 
   TrendPoint({required this.bucket, required this.total});
 
-  factory TrendPoint.fromJson(Map<String, dynamic> json) =>
-      TrendPoint(bucket: DateTime.parse(json['bucket'] as String), total: (json['total'] as num).toDouble());
+  // .toLocal() matters here: the backend buckets in IST and returns a UTC
+  // instant string (see backend/src/utils/dateRange.util.js) — without
+  // converting to the device's local time before formatting, the date label
+  // shown to the user is off by one for anything near a day boundary. Caught
+  // live: an expense logged "today" showed under yesterday's date on the
+  // trend chart until this was added (matches the fix to Expense.fromJson's
+  // `date` field below, which already had it).
+  factory TrendPoint.fromJson(Map<String, dynamic> json) => TrendPoint(
+        bucket: DateTime.parse(json['bucket'] as String).toLocal(),
+        total: (json['total'] as num).toDouble(),
+      );
 }
 
 class AnalyticsTrend {

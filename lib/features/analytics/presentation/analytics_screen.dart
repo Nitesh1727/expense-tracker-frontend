@@ -30,11 +30,12 @@ class AnalyticsScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             SegmentedButton<String>(
+              style: const ButtonStyle(visualDensity: VisualDensity(horizontal: -4)),
               segments: const [
-                ButtonSegment(value: 'day', label: Text('Day')),
-                ButtonSegment(value: 'week', label: Text('Week')),
-                ButtonSegment(value: 'month', label: Text('Month')),
-                ButtonSegment(value: 'year', label: Text('Year')),
+                ButtonSegment(value: 'day', label: _SegmentLabel('Day')),
+                ButtonSegment(value: 'week', label: _SegmentLabel('Week')),
+                ButtonSegment(value: 'month', label: _SegmentLabel('Month')),
+                ButtonSegment(value: 'year', label: _SegmentLabel('Year')),
               ],
               selected: {period},
               onSelectionChanged: (selection) => ref.read(analyticsPeriodProvider.notifier).set(selection.first),
@@ -83,6 +84,24 @@ class AnalyticsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// SegmentedButton gives each segment fairly little width once there are 4
+/// of them, and "Week"/"Month" wrap to two lines at the default text scale
+/// (visible on-device, not caught by static analysis) — scale the label
+/// down to fit its segment instead of wrapping.
+class _SegmentLabel extends StatelessWidget {
+  final String text;
+
+  const _SegmentLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(text, maxLines: 1, softWrap: false),
     );
   }
 }
