@@ -6,18 +6,29 @@ import 'core/theme/app_theme.dart';
 import 'core/widgets/root_shell.dart';
 import 'core/widgets/splash_screen.dart';
 import 'features/auth/presentation/auth_controller.dart';
-import 'features/auth/presentation/phone_entry_screen.dart';
+import 'features/auth/presentation/welcome_screen.dart';
+import 'features/settings/presentation/settings_controller.dart';
 
 class ExpenseTrackerApp extends ConsumerWidget {
   const ExpenseTrackerApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsControllerProvider);
+
     return MaterialApp(
-      title: 'Expense Tracker',
+      title: 'SpendWise',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: AppTheme.light(fontFamily: settings.font.fontFamily),
+      darkTheme: AppTheme.dark(fontFamily: settings.font.fontFamily),
+      // Text-size setting is applied as a global scale factor rather than
+      // baked into the theme's font sizes, so it uniformly affects every
+      // widget (including ones that don't read AppTypography, like default
+      // Material components) exactly the way a user expects "text size" to work.
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(settings.textSize.scale)),
+        child: child!,
+      ),
       home: const AuthGate(),
     );
   }
@@ -52,8 +63,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
 
     final child = authState.when(
       loading: () => const SplashScreen(),
-      error: (_, _) => const PhoneEntryScreen(),
-      data: (user) => user == null ? const PhoneEntryScreen() : const RootShell(),
+      error: (_, _) => const WelcomeScreen(),
+      data: (user) => user == null ? const WelcomeScreen() : const RootShell(),
     );
 
     return AnimatedSwitcher(

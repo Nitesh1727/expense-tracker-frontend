@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
-import '../../export/presentation/export_controller.dart';
+import '../../settings/presentation/settings_screen.dart';
 import 'auth_controller.dart';
+import 'widgets/edit_profile_sheet.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -13,21 +15,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _exporting = false;
   bool _deleting = false;
-
-  Future<void> _export() async {
-    setState(() => _exporting = true);
-    try {
-      await ref.read(exportControllerProvider.notifier).shareCsv();
-    } catch (e) {
-      if (!mounted) return;
-      final message = e is ApiException ? e.message : 'Could not export expenses';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
-  }
 
   Future<void> _logout() => ref.read(authControllerProvider.notifier).logout();
 
@@ -65,6 +53,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = ref.watch(authControllerProvider).value;
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final initial = (user?.name?.isNotEmpty ?? false) ? user!.name![0].toUpperCase() : '👋';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -73,32 +62,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
-                child: Icon(Icons.person_outline, color: colorScheme.primary, size: 28),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.65)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(color: colorScheme.primary.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6)),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Text(initial, style: textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
               ),
               const SizedBox(width: AppSpacing.md),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(user?.name ?? 'Welcome', style: textTheme.titleLarge),
-                  if (user?.phone != null)
-                    Text(user!.phone!, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user?.name ?? 'Add your name', style: textTheme.titleLarge),
+                    if (user?.phone != null)
+                      Text(user!.phone!, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                    if (user?.email != null)
+                      Text(user!.email!, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: user == null ? null : () => showEditProfileSheet(context, user),
               ),
             ],
-          ),
+          ).animate().fadeIn().slideY(begin: 0.05, end: 0),
           const SizedBox(height: AppSpacing.xl),
           Card(
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.ios_share_outlined),
-                  title: const Text('Export as CSV'),
-                  subtitle: const Text('Opens in Google Sheets, Mail, etc.'),
-                  trailing: _exporting ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
-                  onTap: _exporting ? null : _export,
+                  leading: const Icon(Icons.tune_outlined),
+                  title: const Text('Display settings'),
+                  subtitle: const Text('Text size and font'),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -108,7 +116,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ],
             ),
-          ),
+          ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.05, end: 0),
           const SizedBox(height: AppSpacing.lg),
           Card(
             child: ListTile(
@@ -118,7 +126,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               trailing: _deleting ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
               onTap: _deleting ? null : _deleteAccount,
             ),
-          ),
+          ).animate().fadeIn(delay: 140.ms).slideY(begin: 0.05, end: 0),
         ],
       ),
     );

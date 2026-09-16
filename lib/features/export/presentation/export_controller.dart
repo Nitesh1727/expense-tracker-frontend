@@ -16,8 +16,8 @@ class ExportController extends Notifier<void> {
   /// or open it directly in Google Sheets. Never writes to shared/external
   /// storage directly, which would need extra Android permissions that
   /// complicate Play Store review (see backend/docs/API.md export notes).
-  Future<void> shareCsv() async {
-    final csv = await ref.read(exportApiProvider).downloadCsv();
+  Future<void> shareCsv({DateTime? from, DateTime? to}) async {
+    final csv = await ref.read(exportApiProvider).downloadCsv(from: from, to: to);
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/expenses-${DateTime.now().millisecondsSinceEpoch}.csv');
     await file.writeAsString(csv);

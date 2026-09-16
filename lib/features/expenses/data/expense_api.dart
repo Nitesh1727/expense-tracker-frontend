@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../domain/daily_summary.dart';
 import '../domain/expense.dart';
 
 class ExpenseListResult {
@@ -12,6 +13,24 @@ class ExpenseListResult {
   bool get hasMore => items.length + (page - 1) * limit < total;
 }
 
+class DailySummaryResult {
+  final List<DailySummary> days;
+  final int page;
+  final int limit;
+  final bool hasMore;
+
+  DailySummaryResult({required this.days, required this.page, required this.limit, required this.hasMore});
+}
+
+/// A DateTime serialized without `.toUtc()` first sends ambiguous wall-clock
+/// digits with no offset — `new Date(str)` on the Node side then interprets
+/// it as local time *in whatever timezone the server process runs in*, which
+/// silently corrupts date-range filters if that's not the device's timezone.
+/// This is the exact bug class already found and fixed on the backend
+/// (dateRange.util.js) — every date leaving this API client goes through
+/// here so it can't recur from a call site forgetting `.toUtc()`.
+String _toUtcIso(DateTime date) => date.toUtc().toIso8601String();
+
 class ExpenseApi {
   final ApiClient _client;
 
@@ -20,8 +39,8 @@ class ExpenseApi {
   Future<ExpenseListResult> list({DateTime? from, DateTime? to, String? categoryId, int page = 1, int limit = 20}) async {
     try {
       final res = await _client.dio.get('/expenses', queryParameters: {
-        if (from != null) 'from': from.toIso8601String(),
-        if (to != null) 'to': to.toIso8601String(),
+        if (from != null) 'from': _toUtcIso(from),
+        if (to != null) 'to': _toUtcIso(to),
         if (categoryId != null) 'categoryId': categoryId,
         'page': page,
         'limit': limit,
@@ -37,13 +56,29 @@ class ExpenseApi {
     }
   }
 
+  /// Powers Home's collapsible day-tiles — one entry per day with expenses,
+  /// paginated by day count. See backend/docs/API.md.
+  Future<DailySummaryResult> dailySummary({int page = 1, int limit = 15}) async {
+    try {
+      final res = await _client.dio.get('/expenses/daily-summary', queryParameters: {'page': page, 'limit': limit});
+      return DailySummaryResult(
+        days: (res.data['days'] as List).map((d) => DailySummary.fromJson(d)).toList(),
+        page: res.data['page'] as int,
+        limit: res.data['limit'] as int,
+        hasMore: res.data['hasMore'] as bool,
+      );
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
   Future<Expense> create({required double amount, required String description, required String categoryId, DateTime? date}) async {
     try {
       final res = await _client.dio.post('/expenses', data: {
         'amount': amount,
         'description': description,
         'categoryId': categoryId,
-        if (date != null) 'date': date.toIso8601String(),
+        if (date != null) 'date': _toUtcIso(date),
       });
       return Expense.fromJson(res.data['expense']);
     } catch (e) {
@@ -57,7 +92,7 @@ class ExpenseApi {
         if (amount != null) 'amount': amount,
         if (description != null) 'description': description,
         if (categoryId != null) 'categoryId': categoryId,
-        if (date != null) 'date': date.toIso8601String(),
+        if (date != null) 'date': _toUtcIso(date),
       });
       return Expense.fromJson(res.data['expense']);
     } catch (e) {

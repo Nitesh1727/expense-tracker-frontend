@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/glass_bottom_sheet.dart';
 import '../../domain/category.dart';
 import '../category_controller.dart';
 
@@ -13,13 +14,7 @@ import '../category_controller.dart';
 /// colors & icons" for why (keeps every user's category list visually
 /// consistent instead of accumulating clashing custom colors).
 Future<void> showCategoryFormSheet(BuildContext context, {Category? existing}) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (context) => _CategoryFormSheet(existing: existing),
-  );
+  return showGlassBottomSheet(context, builder: (context) => _CategoryFormSheet(existing: existing));
 }
 
 class _CategoryFormSheet extends ConsumerStatefulWidget {

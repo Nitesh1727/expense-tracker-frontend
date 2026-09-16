@@ -10,7 +10,9 @@ class Formatters {
   static final _dayMonth = DateFormat('d MMM');
   static final _dayMonthYear = DateFormat('d MMM yyyy');
   static final _monthYear = DateFormat('MMM yyyy');
+  static final _fullMonthYear = DateFormat('MMMM yyyy');
   static final _weekday = DateFormat('EEEE');
+  static final _year = DateFormat('yyyy');
 
   static String currency(double amount) => _currency.format(amount);
 
@@ -31,5 +33,26 @@ class Formatters {
     if (diff == 1) return 'Yesterday';
     if (diff > 1 && diff < 7) return weekday(date);
     return dayMonth(date);
+  }
+
+  /// The "which month/year am I looking at" header on the Analytics screen.
+  /// [end] is the exclusive upper bound the backend returns (start of the
+  /// *next* period) — subtract a day to get the period's actual last day.
+  static String periodLabel(String period, DateTime start, DateTime end) {
+    final lastDay = end.subtract(const Duration(days: 1));
+    switch (period) {
+      case 'day':
+        return dayMonthYear(start);
+      case 'week':
+        final sameMonth = start.month == lastDay.month && start.year == lastDay.year;
+        final startStr = sameMonth ? DateFormat('d').format(start) : dayMonth(start);
+        return '$startStr – ${dayMonthYear(lastDay)}';
+      case 'month':
+        return _fullMonthYear.format(start);
+      case 'year':
+        return _year.format(start);
+      default:
+        return dayMonthYear(start);
+    }
   }
 }

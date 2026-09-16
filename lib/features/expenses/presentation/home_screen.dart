@@ -5,116 +5,142 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../analytics/presentation/analytics_providers.dart';
-import '../domain/expense.dart';
 import 'expense_history_screen.dart';
 import 'expense_providers.dart';
-import 'widgets/expense_form_sheet.dart';
-import 'widgets/expense_tile.dart';
+import 'widgets/day_tile.dart';
 
-class HomeScreen extends ConsumerWidget {
+const _homePeriodLabels = {'day': 'Today', 'week': 'This week', 'month': 'This month'};
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
-  /// Buckets the (already most-recent-first) list into Today / Yesterday /
-  /// Earlier this week sections, preserving order within each — see
-  /// frontend/docs/DESIGN_SYSTEM.md navigation notes.
-  Map<String, List<Expense>> _grouped(List<Expense> expenses) {
-    final groups = <String, List<Expense>>{};
-    for (final expense in expenses) {
-      final label = Formatters.relativeDayLabel(expense.date);
-      groups.putIfAbsent(label, () => []).add(expense);
-    }
-    return groups;
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels > _scrollController.position.maxScrollExtent - 300) {
+        ref.read(homeFeedControllerProvider.notifier).loadMore();
+      }
+    });
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final recentAsync = ref.watch(recentExpensesProvider);
-    final todaySummaryAsync = ref.watch(todaySummaryProvider);
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final feedAsync = ref.watch(homeFeedControllerProvider);
+    final summaryAsync = ref.watch(homeSummaryProvider);
+    final period = ref.watch(homeSummaryPeriodProvider);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Home')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showExpenseFormSheet(context),
-        child: const Icon(Icons.add),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(recentExpensesProvider);
-          ref.invalidate(todaySummaryProvider);
-        },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xxl),
-          children: [
-            Text("Today's spending", style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
-            const SizedBox(height: AppSpacing.xs),
-            todaySummaryAsync.when(
-              loading: () => const SizedBox(height: 40),
-              error: (_, _) => Text('—', style: textTheme.displayLarge),
-              data: (summary) => Text(Formatters.currency(summary.total), style: textTheme.displayLarge)
-                  .animate()
-                  .fadeIn()
-                  .slideY(begin: 0.1, end: 0),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    // No own Scaffold/AppBar/FAB — this is one page of RootShell's PageView,
+    // which owns the shared AppBar and FAB (action swaps per page).
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Awaited, not just invalidated — the pull-to-refresh spinner should
+        // stay visible until the new data has actually arrived, not
+        // disappear the instant the request is fired.
+        await Future.wait([
+          ref.read(homeFeedControllerProvider.notifier).refresh(),
+          ref.refresh(homeSummaryProvider.future),
+        ]);
+      },
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xxl),
+        children: [
+          PopupMenuButton<String>(
+            initialValue: period,
+            onSelected: (value) => ref.read(homeSummaryPeriodProvider.notifier).set(value),
+            offset: const Offset(0, 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            itemBuilder: (context) => _homePeriodLabels.entries
+                .map((e) => PopupMenuItem(value: e.key, child: Text(e.value)))
+                .toList(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Recent', style: textTheme.titleLarge),
-                TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ExpenseHistoryScreen()),
-                  ),
-                  child: const Text('View all'),
+                Text(
+                  _homePeriodLabels[period] ?? period,
+                  style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
                 ),
+                Icon(Icons.expand_more, size: 18, color: colorScheme.onSurfaceVariant),
               ],
             ),
-            recentAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: Center(child: CircularProgressIndicator()),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          summaryAsync.when(
+            loading: () => const SizedBox(height: 40),
+            error: (_, _) => Text('—', style: textTheme.displayLarge),
+            data: (summary) => Text(Formatters.currency(summary.total), style: textTheme.displayLarge),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Recent', style: textTheme.titleLarge),
+              IconButton(
+                icon: const Icon(Icons.tune),
+                tooltip: 'Filter',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ExpenseHistoryScreen()),
+                ),
               ),
-              error: (e, _) => Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text('Could not load expenses: $e'),
-              ),
-              data: (expenses) {
-                if (expenses.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                    child: EmptyState(
-                      icon: Icons.receipt_long_outlined,
-                      title: 'No expenses yet',
-                      subtitle: 'Tap + to log your first one.',
-                    ),
-                  );
-                }
-
-                final groups = _grouped(expenses);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final entry in groups.entries) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xs),
-                        child: Text(
-                          entry.key,
-                          style: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-                        ),
-                      ),
-                      for (final expense in entry.value)
-                        ExpenseTile(
-                          expense: expense,
-                          onTap: () => showExpenseFormSheet(context, existing: expense),
-                        ).animate().fadeIn(duration: 200.ms).slideX(begin: 0.03, end: 0),
-                    ],
-                  ],
-                );
-              },
+            ],
+          ),
+          feedAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(AppSpacing.xl),
+              child: Center(child: CircularProgressIndicator()),
             ),
-          ],
-        ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Text('Could not load expenses: $e'),
+            ),
+            data: (feed) {
+              if (feed.days.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                  child: EmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'No expenses yet',
+                    subtitle: 'Tap + to log your first one.',
+                  ),
+                );
+              }
+
+              return Column(
+                children: [
+                  for (var i = 0; i < feed.days.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: DayTile(key: ValueKey(feed.days[i].date.toIso8601String()), summary: feed.days[i])
+                          .animate()
+                          .fadeIn(duration: 200.ms, delay: (i * 20).ms)
+                          .slideY(begin: 0.02, end: 0),
+                    ),
+                  if (feed.hasMore)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                      child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }

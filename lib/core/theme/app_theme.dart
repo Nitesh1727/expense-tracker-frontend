@@ -11,7 +11,7 @@ import 'app_spacing.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get light => _build(
+  static ThemeData light({String fontFamily = 'Inter'}) => _build(
         brightness: Brightness.light,
         background: AppColors.lightBackground,
         surface: AppColors.lightSurface,
@@ -21,9 +21,10 @@ class AppTheme {
         primary: AppColors.primaryLight,
         onPrimary: Colors.white,
         error: AppColors.error,
+        fontFamily: fontFamily,
       );
 
-  static ThemeData get dark => _build(
+  static ThemeData dark({String fontFamily = 'Inter'}) => _build(
         brightness: Brightness.dark,
         background: AppColors.darkBackground,
         surface: AppColors.darkSurface,
@@ -33,6 +34,7 @@ class AppTheme {
         primary: AppColors.primaryDark,
         onPrimary: const Color(0xFF0B1F14),
         error: AppColors.errorDark,
+        fontFamily: fontFamily,
       );
 
   static ThemeData _build({
@@ -45,6 +47,7 @@ class AppTheme {
     required Color primary,
     required Color onPrimary,
     required Color error,
+    required String fontFamily,
   }) {
     final colorScheme = ColorScheme(
       brightness: brightness,
@@ -61,7 +64,11 @@ class AppTheme {
       outlineVariant: border,
     );
 
-    final textTheme = GoogleFonts.interTextTheme(
+    // getTextTheme takes the font family as a runtime string (Settings screen
+    // lets the user pick from a curated set — see features/settings) rather
+    // than a hardcoded GoogleFonts.xTextTheme() call per font.
+    final textTheme = GoogleFonts.getTextTheme(
+      fontFamily,
       brightness == Brightness.light ? ThemeData.light().textTheme : ThemeData.dark().textTheme,
     ).apply(bodyColor: textPrimary, displayColor: textPrimary);
 
@@ -77,15 +84,19 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
+        titleTextStyle: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, color: textPrimary),
       ),
+      // Real elevation + a soft shadow, not a flat bordered rectangle — this
+      // is most of what "premium tiles" comes down to visually. Material3's
+      // default surfaceTint (a wash of primary color at higher elevations)
+      // is turned off so cards stay a clean, unmuddied surface color instead.
       cardTheme: CardThemeData(
         color: surface,
-        elevation: 0,
+        elevation: 3,
+        shadowColor: brightness == Brightness.light ? Colors.black.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.4),
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: border),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        margin: EdgeInsets.zero,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -110,9 +121,17 @@ class AppTheme {
           foregroundColor: onPrimary,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 0,
+          elevation: 4,
+          shadowColor: primary.withValues(alpha: 0.4),
           textStyle: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: primary,
+        foregroundColor: onPrimary,
+        elevation: 4,
+        highlightElevation: 8,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: surface,

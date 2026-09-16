@@ -2,19 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/category_avatar.dart';
+import '../../../../core/widgets/glass_bottom_sheet.dart';
 import '../../domain/category.dart';
 import '../category_controller.dart';
 
 /// Grid picker for choosing a category when adding/editing an expense.
 /// Not the same as the Categories tab's CRUD screen — this only selects.
 Future<Category?> showCategoryPicker(BuildContext context, {String? selectedId}) {
-  return showModalBottomSheet<Category>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (context) => _CategoryPickerSheet(selectedId: selectedId),
-  );
+  return showGlassBottomSheet<Category>(context, builder: (context) => _CategoryPickerSheet(selectedId: selectedId));
 }
 
 class _CategoryPickerSheet extends ConsumerWidget {

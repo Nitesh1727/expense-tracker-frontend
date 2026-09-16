@@ -43,46 +43,42 @@ class CategoriesScreen extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showCategoryFormSheet(context),
-        child: const Icon(Icons.add),
-      ),
-      body: categoriesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Could not load categories: $e')),
-        data: (categories) {
-          if (categories.isEmpty) {
-            return const EmptyState(icon: Icons.category_outlined, title: 'No categories yet');
-          }
+    // No own Scaffold/AppBar/FAB — this is one page of RootShell's PageView,
+    // which owns the shared AppBar (title swaps per page) and the FAB
+    // (action swaps per page). See core/widgets/root_shell.dart.
+    return categoriesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Could not load categories: $e')),
+      data: (categories) {
+        if (categories.isEmpty) {
+          return const EmptyState(icon: Icons.category_outlined, title: 'No categories yet');
+        }
 
-          return RefreshIndicator(
-            onRefresh: () => ref.read(categoryControllerProvider.notifier).refresh(),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              itemCount: categories.length,
-              separatorBuilder: (_, _) => const Divider(),
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CategoryAvatar(icon: category.icon, colorHex: category.color),
-                  title: Text(category.name, style: textTheme.bodyLarge),
-                  subtitle: category.isDeletable ? null : Text('Default fallback category', style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
-                  trailing: category.isDeletable
-                      ? IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _confirmDelete(context, ref, category.id, category.name),
-                        )
-                      : null,
-                  onTap: () => showCategoryFormSheet(context, existing: category),
-                );
-              },
-            ),
-          );
-        },
-      ),
+        return RefreshIndicator(
+          onRefresh: () => ref.read(categoryControllerProvider.notifier).refresh(),
+          child: ListView.separated(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            itemCount: categories.length,
+            separatorBuilder: (_, _) => const Divider(),
+            itemBuilder: (context, index) {
+              final category = categories[index];
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CategoryAvatar(icon: category.icon, colorHex: category.color),
+                title: Text(category.name, style: textTheme.bodyLarge),
+                subtitle: category.isDeletable ? null : Text('Default fallback category', style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+                trailing: category.isDeletable
+                    ? IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _confirmDelete(context, ref, category.id, category.name),
+                      )
+                    : null,
+                onTap: () => showCategoryFormSheet(context, existing: category),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

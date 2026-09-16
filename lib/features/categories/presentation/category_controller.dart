@@ -33,12 +33,17 @@ class CategoryController extends AsyncNotifier<List<Category>> {
   /// just the category list, or they'd show stale category references.
   Future<void> delete(String id) async {
     await ref.read(categoryApiProvider).delete(id);
-    await refresh();
-    ref.invalidate(recentExpensesProvider);
+    // Awaited, not just invalidated — see expense_providers.dart's
+    // _refreshDependents for why (invalidate() alone doesn't wait for the
+    // refetch, so a caller navigating away right after would see stale data).
+    await Future.wait([
+      refresh(),
+      ref.read(homeFeedControllerProvider.notifier).refresh(),
+      ref.refresh(homeSummaryProvider.future),
+      ref.refresh(analyticsSummaryProvider.future),
+      ref.refresh(analyticsTrendProvider.future),
+    ]);
     ref.invalidate(expenseHistoryControllerProvider);
-    ref.invalidate(analyticsSummaryProvider);
-    ref.invalidate(analyticsTrendProvider);
-    ref.invalidate(todaySummaryProvider);
   }
 }
 

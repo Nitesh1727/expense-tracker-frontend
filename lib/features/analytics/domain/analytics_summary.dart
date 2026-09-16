@@ -14,17 +14,33 @@ class CategoryBreakdown {
       );
 }
 
+class DateRange {
+  final DateTime start;
+  final DateTime end;
+
+  DateRange({required this.start, required this.end});
+
+  // .toLocal() — same reasoning as everywhere else in this file: the backend
+  // computes ranges in IST and returns UTC instant strings.
+  factory DateRange.fromJson(Map<String, dynamic> json) => DateRange(
+        start: DateTime.parse(json['start'] as String).toLocal(),
+        end: DateTime.parse(json['end'] as String).toLocal(),
+      );
+}
+
 class AnalyticsSummary {
   final String period;
   final double total;
   final List<CategoryBreakdown> byCategory;
+  final DateRange range;
 
-  AnalyticsSummary({required this.period, required this.total, required this.byCategory});
+  AnalyticsSummary({required this.period, required this.total, required this.byCategory, required this.range});
 
   factory AnalyticsSummary.fromJson(Map<String, dynamic> json) => AnalyticsSummary(
         period: json['period'] as String,
         total: (json['total'] as num).toDouble(),
         byCategory: (json['byCategory'] as List).map((c) => CategoryBreakdown.fromJson(c)).toList(),
+        range: DateRange.fromJson(json['range'] as Map<String, dynamic>),
       );
 }
 

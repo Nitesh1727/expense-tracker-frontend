@@ -6,6 +6,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import 'auth_controller.dart';
+import 'profile_prompt_screen.dart';
 
 class OtpVerifyScreen extends ConsumerStatefulWidget {
   final String phone;
@@ -36,14 +37,27 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
 
     setState(() => _verifying = true);
     try {
-      await ref.read(authControllerProvider.notifier).verifyOtp(widget.phone, _codeController.text.trim());
-      // AuthController's state flips to AsyncData(user), which makes AuthGate
-      // (lib/app.dart) swap its content to RootShell — but this screen was
-      // reached via Navigator.push on top of AuthGate's content, so that swap
-      // happens invisibly underneath it. Pop explicitly to reveal it; found by
-      // actually running the app — the OTP screen was hanging silently after
-      // a real, successful login until this pop was added.
-      if (mounted) Navigator.of(context).pop();
+      final result = await ref.read(authControllerProvider.notifier).verifyOtp(widget.phone, _codeController.text.trim());
+      if (!mounted) return;
+
+      if (result.isNewUser) {
+        // A new signup: AuthController deliberately hasn't flipped to
+        // logged-in yet (see its class comment) — show the optional name
+        // prompt first, replacing this screen so back-navigation can't
+        // return to "enter the code" once already verified.
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => ProfilePromptScreen(user: result.user)),
+        );
+      } else {
+        // Existing user: AuthController's state already flipped to
+        // AsyncData(user), which makes AuthGate (lib/app.dart) swap its
+        // content to RootShell underneath — but this screen was reached via
+        // Navigator.push on top of AuthGate's content, so that swap is
+        // invisible until popped. Found by actually running the app — the
+        // OTP screen was hanging silently after a real, successful login
+        // until this pop was added.
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Something went wrong';

@@ -5,6 +5,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/category_avatar.dart';
+import '../../../../core/widgets/glass_bottom_sheet.dart';
 import '../../../categories/domain/category.dart';
 import '../../../categories/presentation/widgets/category_picker_sheet.dart';
 import '../../domain/expense.dart';
@@ -14,13 +15,7 @@ import '../expense_providers.dart';
 /// route — one thumb-reachable tap to open, swipe down to dismiss. Matches
 /// the "minimal fields, quick entry" goal (frontend/docs/DESIGN_SYSTEM.md).
 Future<void> showExpenseFormSheet(BuildContext context, {Expense? existing}) {
-  return showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (context) => _ExpenseFormSheet(existing: existing),
-  );
+  return showGlassBottomSheet(context, builder: (context) => _ExpenseFormSheet(existing: existing));
 }
 
 class _ExpenseFormSheet extends ConsumerStatefulWidget {
@@ -158,7 +153,6 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                           padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
                           side: BorderSide(color: colorScheme.outline),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          alignment: Alignment.centerLeft,
                         ),
                       ),
                     ),

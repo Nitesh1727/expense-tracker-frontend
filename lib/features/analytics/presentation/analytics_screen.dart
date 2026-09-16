@@ -1,72 +1,168 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/category_avatar.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../export/presentation/export_controller.dart';
 import '../domain/analytics_summary.dart';
 import 'analytics_providers.dart';
 
-class AnalyticsScreen extends ConsumerWidget {
+class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
+  bool _exporting = false;
+
+  /// Computes the previous/next period's anchor from the *current* fetch's
+  /// authoritative `range.start` rather than doing calendar math on
+  /// `DateTime.now()` — avoids reimplementing "what's the 1st of next
+  /// month" edge cases (month length, leap years) since the backend already
+  /// solved that once for the range it returned.
+  DateTime _adjacentAnchor(String period, DateTime start, {required bool forward}) {
+    final sign = forward ? 1 : -1;
+    switch (period) {
+      case 'day':
+        return start.add(Duration(days: sign));
+      case 'week':
+        return start.add(Duration(days: 7 * sign));
+      case 'month':
+        return DateTime(start.year, start.month + sign, 1);
+      case 'year':
+      default:
+        return DateTime(start.year + sign, 1, 1);
+    }
+  }
+
+  void _goToPeriod(String period, DateTime start, {required bool forward}) {
+    ref.read(analyticsAnchorProvider.notifier).set(_adjacentAnchor(period, start, forward: forward));
+  }
+
+  Future<void> _export(DateRange range) async {
+    setState(() => _exporting = true);
+    try {
+      await ref.read(exportControllerProvider.notifier).shareCsv(
+            from: range.start,
+            to: range.end.subtract(const Duration(milliseconds: 1)),
+          );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : 'Could not export expenses';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final period = ref.watch(analyticsPeriodProvider);
     final summaryAsync = ref.watch(analyticsSummaryProvider);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Analytics')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(analyticsSummaryProvider);
-          ref.invalidate(analyticsTrendProvider);
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [
-            SegmentedButton<String>(
-              style: const ButtonStyle(visualDensity: VisualDensity(horizontal: -4)),
-              segments: const [
-                ButtonSegment(value: 'day', label: _SegmentLabel('Day')),
-                ButtonSegment(value: 'week', label: _SegmentLabel('Week')),
-                ButtonSegment(value: 'month', label: _SegmentLabel('Month')),
-                ButtonSegment(value: 'year', label: _SegmentLabel('Year')),
-              ],
-              selected: {period},
-              onSelectionChanged: (selection) => ref.read(analyticsPeriodProvider.notifier).set(selection.first),
+    // No own Scaffold/AppBar — one page of RootShell's PageView.
+    return RefreshIndicator(
+      onRefresh: () => Future.wait([
+        ref.refresh(analyticsSummaryProvider.future),
+        ref.refresh(analyticsTrendProvider.future),
+      ]),
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        children: [
+          SegmentedButton<String>(
+            showSelectedIcon: false, // the checkmark ate into "Week"/"Month"/"Year"'s width — the fill color already shows the selection
+            style: const ButtonStyle(visualDensity: VisualDensity(horizontal: -4)),
+            segments: const [
+              ButtonSegment(value: 'day', label: Text('Day')),
+              ButtonSegment(value: 'week', label: Text('Week')),
+              ButtonSegment(value: 'month', label: Text('Month')),
+              ButtonSegment(value: 'year', label: Text('Year')),
+            ],
+            selected: {period},
+            onSelectionChanged: (selection) {
+              ref.read(analyticsPeriodProvider.notifier).set(selection.first);
+              ref.read(analyticsAnchorProvider.notifier).set(null); // switching period always resets to "current"
+            },
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          summaryAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(AppSpacing.xl),
+              child: Center(child: CircularProgressIndicator()),
             ),
-            const SizedBox(height: AppSpacing.xl),
-            summaryAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text('Could not load analytics: $e'),
-              ),
-              data: (summary) {
-                if (summary.byCategory.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-                    child: EmptyState(
-                      icon: Icons.pie_chart_outline,
-                      title: 'Nothing logged for this period',
-                    ),
-                  );
-                }
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Text('Could not load analytics: $e'),
+            ),
+            data: (summary) {
+              final now = DateTime.now();
+              final nextAnchor = _adjacentAnchor(period, summary.range.start, forward: true);
+              final canGoForward = !nextAnchor.isAfter(now);
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Total', style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(Formatters.currency(summary.total), style: textTheme.displayLarge),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Which month/week/year we're looking at, with prev/next —
+                  // shown even when there's nothing logged, so it's always
+                  // clear what an empty state is empty *for*.
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () => _goToPeriod(period, summary.range.start, forward: false),
+                      ),
+                      Expanded(
+                        child: Text(
+                          Formatters.periodLabel(period, summary.range.start, summary.range.end),
+                          textAlign: TextAlign.center,
+                          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: canGoForward ? () => _goToPeriod(period, summary.range.start, forward: true) : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (summary.byCategory.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+                      child: EmptyState(icon: Icons.pie_chart_outline, title: 'Nothing logged for this period'),
+                    )
+                  else ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Total', style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(Formatters.currency(summary.total), style: textTheme.displayLarge),
+                            ],
+                          ),
+                        ),
+                        IconButton.filledTonal(
+                          icon: _exporting
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.ios_share_outlined),
+                          tooltip: 'Export this period as CSV',
+                          onPressed: _exporting ? null : () => _export(summary.range),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: AppSpacing.xl),
                     _CategoryPieChart(summary: summary),
                     const SizedBox(height: AppSpacing.lg),
@@ -78,30 +174,12 @@ class AnalyticsScreen extends ConsumerWidget {
                       const _TrendChart(),
                     ],
                   ],
-                );
-              },
-            ),
-          ],
-        ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
-    );
-  }
-}
-
-/// SegmentedButton gives each segment fairly little width once there are 4
-/// of them, and "Week"/"Month" wrap to two lines at the default text scale
-/// (visible on-device, not caught by static analysis) — scale the label
-/// down to fit its segment instead of wrapping.
-class _SegmentLabel extends StatelessWidget {
-  final String text;
-
-  const _SegmentLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Text(text, maxLines: 1, softWrap: false),
     );
   }
 }
@@ -152,9 +230,7 @@ class _CategoryBreakdownRow extends StatelessWidget {
         children: [
           CategoryAvatar(icon: entry.category.icon, colorHex: entry.category.color, size: 32),
           const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Text(entry.category.name, style: textTheme.bodyLarge),
-          ),
+          Expanded(child: Text(entry.category.name, style: textTheme.bodyLarge)),
           Text(
             '${percent.toStringAsFixed(0)}%',
             style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
