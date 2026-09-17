@@ -6,6 +6,7 @@ import '../domain/app_settings.dart';
 const _textSizeKey = 'settings.textSize';
 const _fontKey = 'settings.font';
 const _themeModeKey = 'settings.themeMode';
+const _accentColorKey = 'settings.accentColor';
 
 /// Persisted locally (per-device) via SharedPreferences — this is a display
 /// preference, not account data, so it deliberately doesn't sync through the
@@ -22,11 +23,16 @@ class SettingsController extends Notifier<AppSettings> {
     final textSizeName = prefs.getString(_textSizeKey);
     final fontName = prefs.getString(_fontKey);
     final themeModeName = prefs.getString(_themeModeKey);
+    final accentColorName = prefs.getString(_accentColorKey);
 
     state = AppSettings(
       textSize: TextSizeOption.values.firstWhere((e) => e.name == textSizeName, orElse: () => TextSizeOption.normal),
       font: AppFontOption.values.firstWhere((e) => e.name == fontName, orElse: () => AppFontOption.inter),
       themeMode: ThemeMode.values.firstWhere((e) => e.name == themeModeName, orElse: () => ThemeMode.system),
+      accentColor: AccentColorOption.values.firstWhere(
+        (e) => e.name == accentColorName,
+        orElse: () => AccentColorOption.terracotta,
+      ),
     );
   }
 
@@ -46,6 +52,12 @@ class SettingsController extends Notifier<AppSettings> {
     state = state.copyWith(themeMode: value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_themeModeKey, value.name);
+  }
+
+  Future<void> setAccentColor(AccentColorOption value) async {
+    state = state.copyWith(accentColor: value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accentColorKey, value.name);
   }
 }
 

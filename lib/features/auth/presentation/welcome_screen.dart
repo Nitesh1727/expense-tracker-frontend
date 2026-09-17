@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/app_theme.dart';
 import 'email_auth_screen.dart';
 import 'phone_entry_screen.dart';
 
@@ -40,7 +41,10 @@ class WelcomeScreen extends StatelessWidget {
                 child: const Icon(Icons.account_balance_wallet_rounded, size: 36, color: Colors.white),
               ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8)),
               const SizedBox(height: AppSpacing.lg),
-              Text('SpendWise', style: textTheme.displayLarge)
+              // displayLarge's size, but opted into the heading serif — AppTheme
+              // reserves the bare displayLarge token for numbers (AmountTile), so
+              // the app's wordmark asks for the serif explicitly here instead.
+              Text('SpendWise', style: AppTheme.headingStyle(textTheme.displayLarge, weight: FontWeight.w700))
                   .animate()
                   .fadeIn(delay: 100.ms)
                   .slideY(begin: 0.1, end: 0),

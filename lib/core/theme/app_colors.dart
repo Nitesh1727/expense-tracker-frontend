@@ -30,6 +30,38 @@ class AppColors {
   static const error = Color(0xFFDC2626);
   static const errorDark = Color(0xFFF87171);
 
+  /// Warm near-black used as text/icon color on every accent's dark-mode
+  /// variant below. Each dark variant is deliberately a light/pastel tint of
+  /// its hue (not hue-tuned individually) specifically so one shared near-black
+  /// reads clearly on all of them, rather than needing a bespoke onPrimary per color.
+  static const onAccentDark = Color(0xFF20201D);
+
+  /// Curated accent (primary) color choices — each pair is a saturated tone
+  /// for light mode (legible with white text) and a soft pastel tone for
+  /// dark mode (legible with [onAccentDark]). See AccentColorOption in
+  /// features/settings/domain/app_settings.dart for the picker enum.
+  static const accentTerracottaLight = primaryLight;
+  static const accentTerracottaDark = primaryDark;
+  static const accentBlueLight = Color(0xFF2563EB);
+  static const accentBlueDark = Color(0xFF93C5FD);
+  static const accentGreenLight = Color(0xFF15803D);
+  static const accentGreenDark = Color(0xFF86EFAC);
+  static const accentPurpleLight = Color(0xFF7C3AED);
+  static const accentPurpleDark = Color(0xFFC4B5FD);
+  static const accentPinkLight = Color(0xFFDB2777);
+  static const accentPinkDark = Color(0xFFF9A8D4);
+  static const accentTealLight = Color(0xFF0F766E);
+  static const accentTealDark = Color(0xFF5EEAD4);
+  static const accentGoldLight = Color(0xFFB45309);
+  static const accentGoldDark = Color(0xFFFCD34D);
+
+  /// "No color" option for anyone who doesn't want a color accent at all —
+  /// renders the Home tile (and every other primary-colored element) in
+  /// shades of grey instead. Warm-toned greys, not neutral cool grays, to
+  /// stay consistent with the rest of the app's warm palette.
+  static const accentMonochromeLight = Color(0xFF44403C);
+  static const accentMonochromeDark = Color(0xFFD6D3D1);
+
   /// The curated palette every category color/chart segment is picked
   /// from — mirrors backend/src/constants/categoryPresets.js exactly, so
   /// a hex the backend sends always maps to a name here.

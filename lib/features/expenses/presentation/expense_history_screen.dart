@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/app_bar_title.dart';
 import '../../../core/widgets/category_avatar.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../categories/presentation/category_controller.dart';
@@ -52,7 +53,7 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
     final activeFilter = ref.watch(expenseHistoryFilterProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('All expenses')),
+      appBar: AppBar(title: const AppBarTitle('All expenses')),
       body: Column(
         children: [
           categoriesAsync.maybeWhen(

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/glass_bottom_sheet.dart';
+import '../../../../core/widgets/picker_dot.dart';
 import '../../domain/category.dart';
 import '../category_controller.dart';
 
@@ -98,7 +99,7 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
                   runSpacing: AppSpacing.sm,
                   children: [
                     for (final entry in CategoryPresets.icons.entries)
-                      _PickerDot(
+                      PickerDot(
                         selected: entry.key == _icon,
                         onTap: () => setState(() => _icon = entry.key),
                         child: Icon(entry.value, color: _icon == entry.key ? colorScheme.primary : colorScheme.onSurfaceVariant),
@@ -113,7 +114,7 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
                   runSpacing: AppSpacing.sm,
                   children: [
                     for (final hex in CategoryPresets.colorHexes)
-                      _PickerDot(
+                      PickerDot(
                         selected: hex == _color,
                         onTap: () => setState(() => _color = hex),
                         child: Container(
@@ -128,32 +129,6 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _PickerDot extends StatelessWidget {
-  final bool selected;
-  final VoidCallback onTap;
-  final Widget child;
-
-  const _PickerDot({required this.selected, required this.onTap, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        width: 44,
-        height: 44,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: selected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2) : null,
-        ),
-        child: child,
       ),
     );
   }

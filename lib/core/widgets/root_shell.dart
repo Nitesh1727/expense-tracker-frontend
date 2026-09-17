@@ -9,6 +9,7 @@ import '../../features/expenses/presentation/home_screen.dart';
 import '../../features/expenses/presentation/widgets/expense_form_sheet.dart';
 import '../providers/value_notifier_provider.dart';
 import '../theme/app_motion.dart';
+import 'app_bar_title.dart';
 
 /// Shell for the 3 main tabs — see frontend/docs/DESIGN_SYSTEM.md
 /// "Navigation". Profile is deliberately not a 4th tab: it's a top-right
@@ -65,7 +66,7 @@ class _RootShellState extends ConsumerState<RootShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tabTitles[index]),
+        title: AppBarTitle(_tabTitles[index]),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),

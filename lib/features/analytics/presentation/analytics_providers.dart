@@ -30,14 +30,20 @@ final analyticsSummaryProvider = FutureProvider.autoDispose<AnalyticsSummary>((r
 // trend view is wanted later), just no longer wired to any UI.
 
 /// Home screen's big total-spend number — its own switchable period
-/// (Today/This week/This month), defaulting to month, deliberately
+/// (Today/This week/This month), defaulting to Today, deliberately
 /// independent of [analyticsPeriodProvider] (the Analytics tab's own
 /// selector) so switching one never changes the other.
-final homeSummaryPeriodProvider = simpleValueProvider<String>('month');
+final homeSummaryPeriodProvider = simpleValueProvider<String>('day');
 
-final homeSummaryProvider = FutureProvider.autoDispose<AnalyticsSummary>((ref) {
-  final period = ref.watch(homeSummaryPeriodProvider);
-  return ref.watch(analyticsApiProvider).summary(period);
+/// All three periods fetched together (in parallel), not just whichever is
+/// currently selected — the AmountTile on Home is a vertically swipeable
+/// tile (see SwipeableAmountTile), so every period's total needs to already
+/// be in hand for the swipe to feel instant instead of showing a loading
+/// flash mid-gesture.
+final homeSummaryProvider = FutureProvider.autoDispose<Map<String, AnalyticsSummary>>((ref) async {
+  final api = ref.watch(analyticsApiProvider);
+  final results = await Future.wait([api.summary('day'), api.summary('week'), api.summary('month')]);
+  return {'day': results[0], 'week': results[1], 'month': results[2]};
 });
 
 /// Trend has no "day" view server-side (a single day has nothing to trend

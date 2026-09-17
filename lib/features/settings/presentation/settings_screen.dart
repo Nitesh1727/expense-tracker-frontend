@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/app_bar_title.dart';
+import '../../../core/widgets/picker_dot.dart';
 import '../domain/app_settings.dart';
 import 'settings_controller.dart';
 
@@ -14,11 +16,11 @@ class SettingsScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Display')),
+      appBar: AppBar(title: const AppBarTitle('Display')),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
-          Text('Theme', style: textTheme.titleMedium),
+          Text('Appearance', style: textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Card(
             child: Padding(
@@ -40,6 +42,37 @@ class SettingsScreen extends ConsumerWidget {
                               ThemeMode.dark => Icons.dark_mode_outlined,
                             },
                           ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Accent color',
+            style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final option in AccentColorOption.values)
+                    PickerDot(
+                      selected: settings.accentColor == option,
+                      onTap: () => ref.read(settingsControllerProvider.notifier).setAccentColor(option),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          // Always previewed in the light-mode tone — it's the more
+                          // saturated, recognizable version of the hue regardless of
+                          // which theme mode is currently active.
+                          color: option.light,
                         ),
                       ),
                     ),
@@ -132,6 +165,7 @@ class _ChoiceCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             Text(
               label,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w400,

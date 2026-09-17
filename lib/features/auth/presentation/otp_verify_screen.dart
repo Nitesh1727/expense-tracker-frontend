@@ -111,7 +111,11 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
                 maxLength: 6,
                 autofocus: true,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: textTheme.headlineSmall?.copyWith(letterSpacing: 12),
+                // titleLarge, not headlineSmall — this is a numeric PIN entry, not a
+                // heading, so it should stay in the sans body font, not the serif
+                // AppTheme applies to headline* styles. fontSize matches headlineSmall's
+                // default so the box doesn't visually shrink from this swap.
+                style: textTheme.titleLarge?.copyWith(letterSpacing: 12, fontSize: 24, fontWeight: FontWeight.w600),
                 decoration: const InputDecoration(counterText: ''),
                 onSubmitted: (_) => _verify(),
               ).animate().fadeIn(delay: 150.ms),

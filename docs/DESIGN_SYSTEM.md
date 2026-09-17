@@ -23,12 +23,31 @@ cool gray — matches the Claude app's own palette per explicit user request
 |-------|-------|------|-----|
 | `background` | `#FAF9F5` | `#262624` | Screen background |
 | `surface` | `#FFFFFF` | `#30302E` | Cards, sheets |
-| `primary` | `#CC5F3B` (terracotta/orange) | `#E8875F` | Primary actions. Originally a green ("money/finance" association) — swapped to this warm orange per explicit user request (Claude's own accent color). |
-| `onPrimary` | `#FFFFFF` | `#2B190E` | Text/icons on primary |
+| `primary` | `#CC5F3B` (terracotta/orange) | `#E8875F` | Primary actions. Originally a green ("money/finance" association) — swapped to this warm orange per explicit user request (Claude's own accent color). Now the *default* of a user-selectable accent — see below. |
+| `onPrimary` | `#FFFFFF` | `#20201D` | Text/icons on primary — a shared warm near-black works in dark mode across every accent option below since each dark variant is deliberately a light pastel tint, not hue-tuned individually. |
 | `textPrimary` | `#2D2A26` | `#F2F0EA` | Main text |
 | `textSecondary` | `#7A776D` | `#A8A599` | Secondary/meta text |
 | `border` | `#E8E5DD` | `#3E3D38` | Dividers, input borders |
 | `error` | `#DC2626` | `#F87171` | Validation errors, delete actions |
+
+**Accent color** is user-selectable in Settings → Appearance (curated swatches,
+not a free color wheel — same reasoning as category colors below: every
+option is pre-checked to stay legible rather than letting a choice wash out
+the UI). `AppTheme.light()`/`.dark()` take a plain `Color primary` rather
+than the enum itself, so `core/theme/` never has to import the settings
+feature — `app.dart` resolves `AccentColorOption` to a `Color` first. See
+`AccentColorOption` in `features/settings/domain/app_settings.dart`.
+
+| Name | Light | Dark |
+|------|-------|------|
+| Terracotta (default) | `#CC5F3B` | `#E8875F` |
+| Blue | `#2563EB` | `#93C5FD` |
+| Green | `#15803D` | `#86EFAC` |
+| Purple | `#7C3AED` | `#C4B5FD` |
+| Pink | `#DB2777` | `#F9A8D4` |
+| Teal | `#0F766E` | `#5EEAD4` |
+| Gold | `#B45309` | `#FCD34D` |
+| Black & white | `#44403C` | `#D6D3D1` | for anyone who doesn't want a color accent — renders as warm-toned grey instead of a hue. |
 
 **Category colors & icons** — categories are user-CRUD-able (see
 `backend/docs/DATABASE.md`), so color and icon are a *curated pick*, not a
@@ -68,9 +87,27 @@ backend DATABASE.md) use the same icon/color values listed there: Food
 
 ## Typography
 
-`google_fonts` — recommend **Inter** or **Manrope** (both are the current
-default choice for clean fintech/consumer apps; pick by eye once a screen is
-up, this is a cheap decision to change later since it's one config line).
+`google_fonts`. Two distinct fonts, not one:
+
+- **Body/UI font** — user-selectable in Settings from a curated set: Inter
+  (default), Manrope, Poppins, Nunito, DM Sans, Plus Jakarta Sans, Work Sans,
+  Outfit. See `AppFontOption` in `features/settings/domain/app_settings.dart`.
+- **Heading font** — fixed, not user-configurable: **Source Serif 4**,
+  applied to `headlineLarge`/`headlineMedium`/`headlineSmall` only (AppBar
+  titles, screen/sheet headers like "Track your spending" or "Add expense").
+  Matches the Claude app's own look (a serif set against an otherwise
+  sans-serif UI) per explicit user request — this was a "make it match by
+  default" ask, not a pickable option, hence it stays fixed while the body
+  font stays curated. `displayLarge`, `titleLarge`, and `titleMedium` are
+  deliberately left in the body font since they're used for numbers
+  (AmountTile totals, day-tile amounts) as well as text — numerals should
+  stay in the legible sans font regardless of heading treatment. Two call
+  sites that use a headline-level style for a genuinely numeric input (the
+  OTP code entry field, the amount field in the add/edit expense sheet)
+  explicitly opt back out to a sans style rather than inheriting the serif.
+  See `AppTheme.headingStyle()` for the one-off case (the splash screen's
+  "SpendWise" wordmark, which intentionally uses `displayLarge`'s size but
+  wants the serif).
 
 | Style | Size | Weight | Use |
 |-------|------|--------|-----|
@@ -141,7 +178,27 @@ AppBar, pushed as a normal route, since it's account-management rather than
 something reached constantly like the 3 tabs are.
 
 1. **Home** — switchable period total (Today/This week/This month, default
-   month) in a rectangular `AmountTile`, quick-add FAB, recent expenses as
+   Today) as a vertically swipeable card (`SwipeableAmountTile`) — swipe up/
+   down to cycle periods, wrapping around at either end. Went through a few
+   iterations per user feedback: a dropdown ("wasn't looking good"), then a
+   small pill switcher, then a compact scroll-wheel, before landing on "the
+   whole tile should visibly scroll, not just its label." The card treatment
+   itself also iterated: a frosted-glass version (blur + translucency) barely
+   read as different from the page background, because backdrop blur only
+   looks like "glass" over a detailed/colorful background — against this
+   app's flat page color it has nothing to blur. Replaced with a bold
+   gradient card built from the user's selected accent color (a "hero stat
+   card" in the style of Cash App/Revolut/Apple Wallet's primary balance
+   card), a colored ambient shadow, and a thin light-catching rim border —
+   this is a **deliberate, scoped exception** to the flat/bordered card style
+   used everywhere else in the app (see Elevation above), specifically
+   because the user wanted this one interactive element to read as bold and
+   premium rather than flat. The next/previous period's card peeks in at the
+   top/bottom edge as the swipe affordance (an earlier version added arrow
+   icons on top of this; removed per feedback — the peeking card alone is
+   enough), plus a one-time nudge animation on first render so the tile's
+   interactivity isn't purely undiscoverable. Quick-add FAB, recent expenses
+   as
    collapsible day-tiles (closed by default, showing date + total; tap to
    expand and lazily load that day's items), paginated by day as you scroll.
    The filter icon opens the full expense history/log screen (category

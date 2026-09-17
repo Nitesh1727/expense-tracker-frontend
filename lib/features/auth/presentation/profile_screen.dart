@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/app_bar_title.dart';
 import '../../settings/presentation/settings_screen.dart';
 import 'auth_controller.dart';
 import 'widgets/edit_profile_sheet.dart';
@@ -56,7 +57,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final initial = (user?.name?.isNotEmpty ?? false) ? user!.name![0].toUpperCase() : '👋';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: const AppBarTitle('Profile')),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [

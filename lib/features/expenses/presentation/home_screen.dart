@@ -3,8 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/amount_tile.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/swipeable_amount_tile.dart';
 import '../../analytics/presentation/analytics_providers.dart';
 import 'expense_history_screen.dart';
 import 'expense_providers.dart';
@@ -44,7 +44,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final summaryAsync = ref.watch(homeSummaryProvider);
     final period = ref.watch(homeSummaryPeriodProvider);
     final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
 
     // No own Scaffold/AppBar/FAB — this is one page of RootShell's PageView,
     // which owns the shared AppBar and FAB (action swaps per page).
@@ -62,30 +61,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xxl),
         children: [
-          AmountTile(
-            header: PopupMenuButton<String>(
-              initialValue: period,
-              onSelected: (value) => ref.read(homeSummaryPeriodProvider.notifier).set(value),
-              offset: const Offset(0, 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              itemBuilder: (context) => _homePeriodLabels.entries
-                  .map((e) => PopupMenuItem(value: e.key, child: Text(e.value)))
-                  .toList(),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _homePeriodLabels[period] ?? period,
-                    style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
-                  ),
-                  Icon(Icons.expand_more, size: 18, color: colorScheme.onSurfaceVariant),
-                ],
-              ),
-            ),
-            amountText: summaryAsync.when(
+          SwipeableAmountTile<String>(
+            options: [for (final entry in _homePeriodLabels.entries) (entry.key, entry.value)],
+            selected: period,
+            onChanged: (value) => ref.read(homeSummaryPeriodProvider.notifier).set(value),
+            amountFor: (periodKey) => summaryAsync.when(
               loading: () => '···',
               error: (_, _) => '—',
-              data: (summary) => Formatters.currency(summary.total),
+              data: (summaries) => Formatters.currency(summaries[periodKey]?.total ?? 0),
             ),
           ),
           const SizedBox(height: AppSpacing.xl),

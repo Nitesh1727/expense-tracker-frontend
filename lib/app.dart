@@ -19,8 +19,8 @@ class ExpenseTrackerApp extends ConsumerWidget {
     return MaterialApp(
       title: 'SpendWise',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(fontFamily: settings.font.fontFamily),
-      darkTheme: AppTheme.dark(fontFamily: settings.font.fontFamily),
+      theme: AppTheme.light(fontFamily: settings.font.fontFamily, primary: settings.accentColor.light),
+      darkTheme: AppTheme.dark(fontFamily: settings.font.fontFamily, primary: settings.accentColor.dark),
       themeMode: settings.themeMode,
       // Text-size setting is applied as a global scale factor rather than
       // baked into the theme's font sizes, so it uniformly affects every

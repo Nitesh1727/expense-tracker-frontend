@@ -29,6 +29,7 @@ class _ExpenseFormSheet extends ConsumerStatefulWidget {
 
 class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _amountFocusNode = FocusNode();
   late final _amountController = TextEditingController(
     text: widget.existing != null ? widget.existing!.amount.toStringAsFixed(0) : '',
   );
@@ -43,12 +44,39 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
   void initState() {
     super.initState();
     _selectedCategory = widget.existing?.category;
+    if (!_isEditing) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focusAmountOnceSheetSettles());
+    }
+  }
+
+  /// The amount field used to be `autofocus: true`, which requested the
+  /// keyboard the instant this sheet built — at the same moment the sheet's
+  /// own slide-up transition started. Two animations racing at once (each
+  /// forcing a relayout of the whole form via `viewInsets.bottom` changing)
+  /// was the actual cause of the perceptible lag opening this sheet, not the
+  /// form itself being heavy. Waiting for the enclosing route's transition
+  /// to finish before requesting focus lets the sheet finish sliding in
+  /// first, so the keyboard's own animation runs on its own.
+  void _focusAmountOnceSheetSettles() {
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.status == AnimationStatus.completed) {
+      _amountFocusNode.requestFocus();
+      return;
+    }
+    void listener(AnimationStatus status) {
+      if (status != AnimationStatus.completed) return;
+      animation.removeStatusListener(listener);
+      if (mounted) _amountFocusNode.requestFocus();
+    }
+
+    animation.addStatusListener(listener);
   }
 
   @override
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
+    _amountFocusNode.dispose();
     super.dispose();
   }
 
@@ -122,9 +150,12 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                 const SizedBox(height: AppSpacing.lg),
                 TextFormField(
                   controller: _amountController,
+                  focusNode: _amountFocusNode,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  autofocus: !_isEditing,
-                  style: textTheme.headlineMedium,
+                  // headlineMedium's size, but forced back to the sans body font —
+                  // this is the amount input, not a heading, and AppTheme applies a
+                  // serif to headlineMedium for actual section headings.
+                  style: textTheme.headlineMedium?.copyWith(fontFamily: textTheme.bodyLarge?.fontFamily),
                   decoration: const InputDecoration(prefixText: '₹  ', hintText: '0'),
                   validator: (value) {
                     final amount = double.tryParse(value?.trim() ?? '');
