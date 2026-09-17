@@ -50,8 +50,12 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
       }
       // AuthController's state is now logged-in; AuthGate (lib/app.dart) swaps
       // its content to RootShell underneath this screen (pushed on top of it),
-      // so pop to reveal it — same reasoning as OtpVerifyScreen.
-      if (mounted) Navigator.of(context).pop();
+      // so pop to reveal it. popUntil(isFirst), not a plain pop() — this
+      // screen is currently only one level deep, but the phone flow made the
+      // same single-pop assumption and broke when WelcomeScreen added a
+      // level in front of it (see OtpVerifyScreen). popUntil is correct at
+      // any depth, so it can't silently break here the same way later.
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Something went wrong';

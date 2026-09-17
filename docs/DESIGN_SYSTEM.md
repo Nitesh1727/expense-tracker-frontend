@@ -15,15 +15,19 @@ exist, not as locked-in decisions.
 Light and dark mode both required (this is standard on modern polished apps
 and low-cost to do if tokens are used consistently from the start).
 
+Palette is warm-neutral (ivory/paper in light, warm charcoal in dark), not
+cool gray — matches the Claude app's own palette per explicit user request
+("make it look exactly like the Claude app... clean and minimal").
+
 | Token | Light | Dark | Use |
 |-------|-------|------|-----|
-| `background` | `#FAFAFA` | `#121212` | Screen background |
-| `surface` | `#FFFFFF` | `#1E1E1E` | Cards, sheets |
-| `primary` | `#16A34A` (green) | `#22C55E` | Primary actions, positive/expense-saved states — green reads as "money/finance" without being a bank-navy cliché |
-| `onPrimary` | `#FFFFFF` | `#0B1F14` | Text/icons on primary |
-| `textPrimary` | `#111827` | `#F5F5F5` | Main text |
-| `textSecondary` | `#6B7280` | `#A1A1AA` | Secondary/meta text |
-| `border` | `#E5E7EB` | `#2A2A2A` | Dividers, input borders |
+| `background` | `#FAF9F5` | `#262624` | Screen background |
+| `surface` | `#FFFFFF` | `#30302E` | Cards, sheets |
+| `primary` | `#CC5F3B` (terracotta/orange) | `#E8875F` | Primary actions. Originally a green ("money/finance" association) — swapped to this warm orange per explicit user request (Claude's own accent color). |
+| `onPrimary` | `#FFFFFF` | `#2B190E` | Text/icons on primary |
+| `textPrimary` | `#2D2A26` | `#F2F0EA` | Main text |
+| `textSecondary` | `#7A776D` | `#A8A599` | Secondary/meta text |
+| `border` | `#E8E5DD` | `#3E3D38` | Dividers, input borders |
 | `error` | `#DC2626` | `#F87171` | Validation errors, delete actions |
 
 **Category colors & icons** — categories are user-CRUD-able (see
@@ -98,6 +102,15 @@ lg = 24   (bottom sheets, modals)
 full = 999 (pills, avatar)
 ```
 
+## Elevation
+
+Flat, not drop-shadowed. Cards, buttons, and sheets use a hairline `border`
+and little-to-no shadow rather than Material's default elevation shadows —
+this reads as calm and considered rather than "decorated," matching the
+Claude app. The FAB is the one exception (elevation 1, so it still reads as
+floating above the content), and bottom sheets are a flat solid surface with
+a drag handle — no backdrop blur/glass effect.
+
 ## Motion
 
 Consistency here is what actually reads as "smooth premium app" — not any
@@ -121,18 +134,28 @@ Rules of thumb:
 
 ## Navigation
 
-Bottom nav, 4 tabs — each a genuinely distinct destination, kept minimal on
-purpose:
+Bottom nav, 3 tabs in a swipeable `PageView` (not just tappable) — each a
+genuinely distinct destination, kept minimal on purpose. Profile is
+deliberately **not** a 4th tab: it's a top-right avatar icon in the shared
+AppBar, pushed as a normal route, since it's account-management rather than
+something reached constantly like the 3 tabs are.
 
-1. **Home** — today's total, quick-add entry point, recent expenses grouped
-   into `Today` / `Yesterday` / `Earlier this week` sections. "View all"
-   from here opens the full expense history/log screen (filters, edit,
-   delete) — that history list is a pushed route, not its own tab, since it's
-   a drill-down of Home rather than a separate concern.
-2. **Analytics** — period selector (Day/Week/Month/Year), total, pie/donut
-   chart by category, trend chart over the period.
+1. **Home** — switchable period total (Today/This week/This month, default
+   month) in a rectangular `AmountTile`, quick-add FAB, recent expenses as
+   collapsible day-tiles (closed by default, showing date + total; tap to
+   expand and lazily load that day's items), paginated by day as you scroll.
+   The filter icon opens the full expense history/log screen (category
+   filter, edit, delete) — a pushed route, not its own tab, since it's a
+   drill-down of Home rather than a separate concern.
+2. **Analytics** — period selector (Day/Week/Month/Year) with prev/next
+   navigation and a clear "which period" label, total in an `AmountTile`,
+   category breakdown list, CSV export (scoped to whatever period is showing,
+   or a custom date range). Deliberately no charts — removed per explicit
+   user feedback ("keep this simple").
 3. **Categories** — list of the user's categories with CRUD (add/edit/delete).
-4. **Profile** — account info, logout, delete account, CSV export action.
+
+**Profile** (pushed, not a tab) — account info + edit, display settings
+(theme mode, text size, font), logout, delete account.
 
 ## Component notes
 

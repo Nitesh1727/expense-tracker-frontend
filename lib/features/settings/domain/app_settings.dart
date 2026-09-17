@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart' show ThemeMode;
+
 enum TextSizeOption {
   small,
   normal,
@@ -33,14 +35,33 @@ enum AppFontOption {
       };
 }
 
+/// Flutter's own ThemeMode (system/light/dark) — reused directly rather
+/// than wrapping it in a parallel enum, since that's exactly what
+/// MaterialApp.themeMode already expects.
+extension ThemeModeLabel on ThemeMode {
+  String get label => switch (this) {
+        ThemeMode.system => 'Match system',
+        ThemeMode.light => 'Light',
+        ThemeMode.dark => 'Dark',
+      };
+}
+
 class AppSettings {
   final TextSizeOption textSize;
   final AppFontOption font;
+  final ThemeMode themeMode;
 
-  const AppSettings({required this.textSize, required this.font});
+  const AppSettings({required this.textSize, required this.font, required this.themeMode});
 
-  static const defaults = AppSettings(textSize: TextSizeOption.normal, font: AppFontOption.inter);
+  static const defaults = AppSettings(
+    textSize: TextSizeOption.normal,
+    font: AppFontOption.inter,
+    themeMode: ThemeMode.system,
+  );
 
-  AppSettings copyWith({TextSizeOption? textSize, AppFontOption? font}) =>
-      AppSettings(textSize: textSize ?? this.textSize, font: font ?? this.font);
+  AppSettings copyWith({TextSizeOption? textSize, AppFontOption? font, ThemeMode? themeMode}) => AppSettings(
+        textSize: textSize ?? this.textSize,
+        font: font ?? this.font,
+        themeMode: themeMode ?? this.themeMode,
+      );
 }

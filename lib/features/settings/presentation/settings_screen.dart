@@ -18,6 +18,36 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
+          Text('Theme', style: textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  for (final mode in ThemeMode.values)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: _ChoiceCard(
+                          label: mode.label,
+                          selected: settings.themeMode == mode,
+                          onTap: () => ref.read(settingsControllerProvider.notifier).setThemeMode(mode),
+                          preview: Icon(
+                            switch (mode) {
+                              ThemeMode.system => Icons.brightness_auto_outlined,
+                              ThemeMode.light => Icons.light_mode_outlined,
+                              ThemeMode.dark => Icons.dark_mode_outlined,
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
           Text('Text size', style: textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Card(

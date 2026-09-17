@@ -114,7 +114,6 @@ class ExpenseMutationController extends Notifier<void> {
       ref.read(homeFeedControllerProvider.notifier).refresh(),
       ref.refresh(homeSummaryProvider.future),
       ref.refresh(analyticsSummaryProvider.future),
-      ref.refresh(analyticsTrendProvider.future),
     ]);
     // Not awaited: the history list isn't visible while a mutation sheet is
     // open, so it just needs to be marked stale for whenever it's next shown.

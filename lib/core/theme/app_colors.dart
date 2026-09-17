@@ -8,23 +8,25 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Light
-  static const lightBackground = Color(0xFFFAFAFA);
+  // Light — warm neutrals (ivory/paper background, warm-black text) rather
+  // than cool grays, matching the Claude app's palette per explicit request.
+  static const lightBackground = Color(0xFFFAF9F5);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightTextPrimary = Color(0xFF111827);
-  static const lightTextSecondary = Color(0xFF6B7280);
-  static const lightBorder = Color(0xFFE5E7EB);
+  static const lightTextPrimary = Color(0xFF2D2A26);
+  static const lightTextSecondary = Color(0xFF7A776D);
+  static const lightBorder = Color(0xFFE8E5DD);
 
-  // Dark
-  static const darkBackground = Color(0xFF121212);
-  static const darkSurface = Color(0xFF1E1E1E);
-  static const darkTextPrimary = Color(0xFFF5F5F5);
-  static const darkTextSecondary = Color(0xFFA1A1AA);
-  static const darkBorder = Color(0xFF2A2A2A);
+  // Dark — Claude's signature warm charcoal, not a cool blue-gray.
+  static const darkBackground = Color(0xFF262624);
+  static const darkSurface = Color(0xFF30302E);
+  static const darkTextPrimary = Color(0xFFF2F0EA);
+  static const darkTextSecondary = Color(0xFFA8A599);
+  static const darkBorder = Color(0xFF3E3D38);
 
-  // Shared across both modes
-  static const primaryLight = Color(0xFF16A34A);
-  static const primaryDark = Color(0xFF22C55E);
+  // Shared across both modes — warm terracotta/orange (Claude's own accent
+  // color), swapped in from the original green per the user's request.
+  static const primaryLight = Color(0xFFCC5F3B);
+  static const primaryDark = Color(0xFFE8875F);
   static const error = Color(0xFFDC2626);
   static const errorDark = Color(0xFFF87171);
 

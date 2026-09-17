@@ -21,6 +21,7 @@ class ExpenseTrackerApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(fontFamily: settings.font.fontFamily),
       darkTheme: AppTheme.dark(fontFamily: settings.font.fontFamily),
+      themeMode: settings.themeMode,
       // Text-size setting is applied as a global scale factor rather than
       // baked into the theme's font sizes, so it uniformly affects every
       // widget (including ones that don't read AppTypography, like default

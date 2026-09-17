@@ -58,7 +58,7 @@ frontend/lib/
 │   ├── analytics/
 │   │   ├── data/
 │   │   ├── domain/
-│   │   └── presentation/          # period filter tabs, pie + trend charts (fl_chart)
+│   │   └── presentation/          # period selector, category breakdown list, export
 │   └── export/
 │       └── presentation/          # export action + share sheet trigger, lives in Profile
 └── test/
@@ -76,7 +76,6 @@ folders.
 | `flutter_riverpod` | State management | See above. |
 | `dio` | HTTP client | Interceptor support for attaching the JWT and centralizing error handling, without needing code generation. |
 | `flutter_secure_storage` | JWT persistence | Keychain/Keystore-backed — plain `SharedPreferences` for an auth token is a bad practice both stores' reviewers can flag. |
-| `fl_chart` | Analytics charts | Lightweight, customizable, good animation support out of the box. |
 | `flutter_animate` | Declarative micro-animations | Gets Blinkit-tier polish (fades, slides, staggered list entrances) with minimal code — fits the "smooth but simple" goal. |
 | `google_fonts` | Typography | One line to get a polished typeface instead of the system default. |
 | `csv` | CSV generation | Client-side CSV building for export (or backend-generated — see below). |
@@ -95,19 +94,38 @@ directly in Sheets. Client never needs raw storage-write permissions.
 
 ## Navigation
 
-Plain `Navigator`/`MaterialPageRoute` and bottom-nav `IndexedStack` — no
-routing package. `go_router` was the original plan (see the dependency
-table above's history in git), but it was dropped during implementation:
-this app has no deep-linking requirement and only ever has two top-level
-states (signed out / signed in with 4 flat tabs), so `go_router`'s
-redirect-based auth gating adds a real class of timing bugs (redirect
-evaluated against a stale/loading auth state) for no payoff here. Instead:
-`lib/app.dart` holds an `AuthGate` that watches `authControllerProvider`
-and swaps between `PhoneEntryScreen` and `RootShell` inside an
-`AnimatedSwitcher` (so the swap still cross-fades instead of jumping); each
-tab in `RootShell` and every drill-down/sheet uses plain
-`Navigator.push`/`showModalBottomSheet`. Revisit only if the app grows
-screens that genuinely need URL-addressable deep links.
+Plain `Navigator`/`MaterialPageRoute` — no routing package. `go_router` was
+the original plan (see git history), dropped during implementation: this app
+has no deep-linking requirement, so its redirect-based auth gating would add
+a real class of timing bugs (redirect evaluated against a stale/loading auth
+state) for no payoff here. Instead `lib/app.dart` holds an `AuthGate` that
+watches `authControllerProvider` and swaps between `WelcomeScreen` and
+`RootShell` inside an `AnimatedSwitcher`. `RootShell` is 3 bottom-nav tabs
+(Home, Analytics, Categories) in a `PageView` (swipeable, not just tappable)
+plus a top-right avatar that pushes `ProfileScreen` — Profile is deliberately
+not a 4th tab, see `docs/DESIGN_SYSTEM.md`.
+
+**The auth flow's navigation depth matters and has already broken once.**
+`WelcomeScreen` is `AuthGate`'s content; phone login pushes
+`PhoneEntryScreen` then `OtpVerifyScreen` **on top of it** — two levels deep,
+not one. Email login only pushes `EmailAuthScreen` — one level deep. When
+`AuthController`'s state flips to logged-in, `AuthGate` swaps its content to
+`RootShell` *underneath* whichever of these screens is on top — invisibly,
+since that screen is still the active route. Every one of these screens must
+clear itself off the stack after a successful login/signup so the swapped-in
+`RootShell` becomes visible. **Use `Navigator.of(context).popUntil((route)
+=> route.isFirst)`, never a plain `pop()`** — a single `pop()` only removes
+one level, which is exactly what shipped originally and broke phone login:
+verifying successfully appeared to loop back to "enter your phone number"
+forever, because popping `OtpVerifyScreen` only revealed `PhoneEntryScreen`
+still sitting above the (already-swapped) `RootShell`. `popUntil(isFirst)`
+is correct regardless of how many screens are stacked, so this can't
+silently regress again if a future screen gets inserted into either flow.
+
+Every drill-down/sheet elsewhere (History, expense/category forms, Profile
+edit) uses plain `Navigator.push`/`showModalBottomSheet` — this depth
+concern is specific to the auth flow's relationship with `AuthGate`, not a
+general rule.
 
 ## Networking + auth
 

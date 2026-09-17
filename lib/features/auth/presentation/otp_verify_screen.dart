@@ -51,12 +51,13 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       } else {
         // Existing user: AuthController's state already flipped to
         // AsyncData(user), which makes AuthGate (lib/app.dart) swap its
-        // content to RootShell underneath — but this screen was reached via
-        // Navigator.push on top of AuthGate's content, so that swap is
-        // invisible until popped. Found by actually running the app — the
-        // OTP screen was hanging silently after a real, successful login
-        // until this pop was added.
-        Navigator.of(context).pop();
+        // content to RootShell underneath — but this screen sits on top of
+        // it via WelcomeScreen -> PhoneEntryScreen -> OtpVerifyScreen (two
+        // pushes deep). A single pop() only revealed PhoneEntryScreen again
+        // — a real regression from adding WelcomeScreen, caught live: phone
+        // login looked like it looped back to "enter your number" forever.
+        // popUntil(isFirst) clears the whole auth stack regardless of depth.
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (!mounted) return;

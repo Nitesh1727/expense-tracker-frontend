@@ -23,6 +23,12 @@ final analyticsSummaryProvider = FutureProvider.autoDispose<AnalyticsSummary>((r
   return ref.watch(analyticsApiProvider).summary(period, anchor: anchor);
 });
 
+// Trend chart was removed from the Analytics screen (kept simple, per the
+// user) — analyticsTrendProvider used to live here. The backend's
+// GET /analytics/trend endpoint and AnalyticsApi.trend()/AnalyticsTrend
+// model are left in place (harmless, and a straightforward re-add if a
+// trend view is wanted later), just no longer wired to any UI.
+
 /// Home screen's big total-spend number — its own switchable period
 /// (Today/This week/This month), defaulting to month, deliberately
 /// independent of [analyticsPeriodProvider] (the Analytics tab's own

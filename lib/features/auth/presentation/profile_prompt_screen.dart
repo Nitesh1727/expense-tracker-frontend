@@ -34,11 +34,12 @@ class _ProfilePromptScreenState extends ConsumerState<ProfilePromptScreen> {
   }
 
   void _finish(User user) {
-    // Same reasoning as OtpVerifyScreen's pop: this screen sits on top of
-    // AuthGate's content in the Navigator stack, so flipping auth state
-    // alone would swap RootShell in invisibly underneath — pop to reveal it.
+    // Same reasoning as OtpVerifyScreen's popUntil: this screen was reached
+    // via WelcomeScreen -> PhoneEntryScreen -> (pushReplacement)
+    // ProfilePromptScreen, two levels above AuthGate's content — a single
+    // pop() would only reveal PhoneEntryScreen again.
     ref.read(authControllerProvider.notifier).completeOnboarding(user);
-    Navigator.of(context).pop();
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _skip() => _finish(widget.user);

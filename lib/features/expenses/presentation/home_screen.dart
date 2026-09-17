@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/amount_tile.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../analytics/presentation/analytics_providers.dart';
 import 'expense_history_screen.dart';
@@ -61,30 +62,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.xxl),
         children: [
-          PopupMenuButton<String>(
-            initialValue: period,
-            onSelected: (value) => ref.read(homeSummaryPeriodProvider.notifier).set(value),
-            offset: const Offset(0, 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            itemBuilder: (context) => _homePeriodLabels.entries
-                .map((e) => PopupMenuItem(value: e.key, child: Text(e.value)))
-                .toList(),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _homePeriodLabels[period] ?? period,
-                  style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
-                ),
-                Icon(Icons.expand_more, size: 18, color: colorScheme.onSurfaceVariant),
-              ],
+          AmountTile(
+            header: PopupMenuButton<String>(
+              initialValue: period,
+              onSelected: (value) => ref.read(homeSummaryPeriodProvider.notifier).set(value),
+              offset: const Offset(0, 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              itemBuilder: (context) => _homePeriodLabels.entries
+                  .map((e) => PopupMenuItem(value: e.key, child: Text(e.value)))
+                  .toList(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _homePeriodLabels[period] ?? period,
+                    style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+                  ),
+                  Icon(Icons.expand_more, size: 18, color: colorScheme.onSurfaceVariant),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          summaryAsync.when(
-            loading: () => const SizedBox(height: 40),
-            error: (_, _) => Text('—', style: textTheme.displayLarge),
-            data: (summary) => Text(Formatters.currency(summary.total), style: textTheme.displayLarge),
+            amountText: summaryAsync.when(
+              loading: () => '···',
+              error: (_, _) => '—',
+              data: (summary) => Formatters.currency(summary.total),
+            ),
           ),
           const SizedBox(height: AppSpacing.xl),
           Row(

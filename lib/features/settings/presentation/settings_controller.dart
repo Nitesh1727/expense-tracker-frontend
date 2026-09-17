@@ -1,9 +1,11 @@
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../domain/app_settings.dart';
 
 const _textSizeKey = 'settings.textSize';
 const _fontKey = 'settings.font';
+const _themeModeKey = 'settings.themeMode';
 
 /// Persisted locally (per-device) via SharedPreferences — this is a display
 /// preference, not account data, so it deliberately doesn't sync through the
@@ -19,10 +21,12 @@ class SettingsController extends Notifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     final textSizeName = prefs.getString(_textSizeKey);
     final fontName = prefs.getString(_fontKey);
+    final themeModeName = prefs.getString(_themeModeKey);
 
     state = AppSettings(
       textSize: TextSizeOption.values.firstWhere((e) => e.name == textSizeName, orElse: () => TextSizeOption.normal),
       font: AppFontOption.values.firstWhere((e) => e.name == fontName, orElse: () => AppFontOption.inter),
+      themeMode: ThemeMode.values.firstWhere((e) => e.name == themeModeName, orElse: () => ThemeMode.system),
     );
   }
 
@@ -36,6 +40,12 @@ class SettingsController extends Notifier<AppSettings> {
     state = state.copyWith(font: value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_fontKey, value.name);
+  }
+
+  Future<void> setThemeMode(ThemeMode value) async {
+    state = state.copyWith(themeMode: value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeModeKey, value.name);
   }
 }
 

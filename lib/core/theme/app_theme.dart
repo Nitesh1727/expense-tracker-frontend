@@ -32,7 +32,7 @@ class AppTheme {
         textSecondary: AppColors.darkTextSecondary,
         border: AppColors.darkBorder,
         primary: AppColors.primaryDark,
-        onPrimary: const Color(0xFF0B1F14),
+        onPrimary: const Color(0xFF2B190E), // warm near-black, not a leftover green-tinted one from the original palette
         error: AppColors.errorDark,
         fontFamily: fontFamily,
       );
@@ -86,16 +86,20 @@ class AppTheme {
         centerTitle: false,
         titleTextStyle: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700, color: textPrimary),
       ),
-      // Real elevation + a soft shadow, not a flat bordered rectangle — this
-      // is most of what "premium tiles" comes down to visually. Material3's
-      // default surfaceTint (a wash of primary color at higher elevations)
-      // is turned off so cards stay a clean, unmuddied surface color instead.
+      // Flat, bordered surfaces rather than drop-shadowed "premium" tiles —
+      // matches the calm, minimal card treatment of the Claude app (a hairline
+      // border and a barely-there shadow read as considered, not decorated).
+      // Material3's default surfaceTint (a wash of primary color at higher
+      // elevations) is turned off so cards stay a clean, unmuddied surface color.
       cardTheme: CardThemeData(
         color: surface,
-        elevation: 3,
-        shadowColor: brightness == Brightness.light ? Colors.black.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.4),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: border),
+        ),
         margin: EdgeInsets.zero,
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -120,18 +124,17 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: onPrimary,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 4,
-          shadowColor: primary.withValues(alpha: 0.4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          elevation: 0,
           textStyle: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: primary,
         foregroundColor: onPrimary,
-        elevation: 4,
-        highlightElevation: 8,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        elevation: 1,
+        highlightElevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: surface,

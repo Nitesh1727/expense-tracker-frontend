@@ -1,11 +1,10 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/amount_tile.dart';
 import '../../../core/widgets/category_avatar.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../export/presentation/export_controller.dart';
@@ -46,13 +45,14 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     ref.read(analyticsAnchorProvider.notifier).set(_adjacentAnchor(period, start, forward: forward));
   }
 
-  Future<void> _export(DateRange range) async {
+  Future<void> _exportRange({required DateTime from, required DateTime to}) async {
     setState(() => _exporting = true);
     try {
-      await ref.read(exportControllerProvider.notifier).shareCsv(
-            from: range.start,
-            to: range.end.subtract(const Duration(milliseconds: 1)),
-          );
+      // `to` is exclusive everywhere in this API (see backend/docs/API.md) —
+      // callers picking a calendar day range (a `range.end` from the
+      // backend, or a date-range-picker's last day) add one day themselves
+      // rather than this method guessing which case it's in.
+      await ref.read(exportControllerProvider.notifier).shareCsv(from: from, to: to);
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not export expenses';
@@ -60,6 +60,23 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
+  }
+
+  Future<void> _exportCustomRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now,
+      initialDateRange: DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now),
+    );
+    if (picked == null || !mounted) return;
+
+    // The picker returns calendar days inclusive of both ends — add a day
+    // to the end so the exclusive `to` boundary covers all of the last day.
+    final to = DateTime(picked.end.year, picked.end.month, picked.end.day).add(const Duration(days: 1));
+    final from = DateTime(picked.start.year, picked.start.month, picked.start.day);
+    await _exportRange(from: from, to: to);
   }
 
   @override
@@ -71,10 +88,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
     // No own Scaffold/AppBar — one page of RootShell's PageView.
     return RefreshIndicator(
-      onRefresh: () => Future.wait([
-        ref.refresh(analyticsSummaryProvider.future),
-        ref.refresh(analyticsTrendProvider.future),
-      ]),
+      onRefresh: () => ref.refresh(analyticsSummaryProvider.future),
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
@@ -135,78 +149,38 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
+                  AmountTile(
+                    header: Text('Total', style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                    amountText: Formatters.currency(summary.total),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
                   if (summary.byCategory.isEmpty)
                     const Padding(
-                      padding: EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-                      child: EmptyState(icon: Icons.pie_chart_outline, title: 'Nothing logged for this period'),
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
+                      child: EmptyState(icon: Icons.receipt_long_outlined, title: 'Nothing logged for this period'),
                     )
-                  else ...[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Total', style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(Formatters.currency(summary.total), style: textTheme.displayLarge),
-                            ],
-                          ),
-                        ),
-                        IconButton.filledTonal(
-                          icon: _exporting
-                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Icon(Icons.ios_share_outlined),
-                          tooltip: 'Export this period as CSV',
-                          onPressed: _exporting ? null : () => _export(summary.range),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    _CategoryPieChart(summary: summary),
-                    const SizedBox(height: AppSpacing.lg),
+                  else
                     for (final entry in summary.byCategory) _CategoryBreakdownRow(entry: entry, total: summary.total),
-                    if (period != 'day') ...[
-                      const SizedBox(height: AppSpacing.xl),
-                      Text('Trend', style: textTheme.titleLarge),
-                      const SizedBox(height: AppSpacing.md),
-                      const _TrendChart(),
-                    ],
-                  ],
+                  const SizedBox(height: AppSpacing.xl),
+                  FilledButton.icon(
+                    onPressed: _exporting ? null : () => _exportRange(from: summary.range.start, to: summary.range.end),
+                    icon: _exporting
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.ios_share_outlined),
+                    label: Text(_exporting ? 'Exporting...' : 'Export this period as CSV'),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Center(
+                    child: TextButton(
+                      onPressed: _exporting ? null : _exportCustomRange,
+                      child: const Text('Choose a custom date range instead'),
+                    ),
+                  ),
                 ],
               );
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CategoryPieChart extends StatelessWidget {
-  final AnalyticsSummary summary;
-
-  const _CategoryPieChart({required this.summary});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 200,
-      child: PieChart(
-        PieChartData(
-          sectionsSpace: 2,
-          centerSpaceRadius: 50,
-          sections: [
-            for (final entry in summary.byCategory)
-              PieChartSectionData(
-                value: entry.total,
-                color: AppColors.fromHex(entry.category.color),
-                title: '',
-                radius: 40,
-              ),
-          ],
-        ),
       ),
     );
   }
@@ -239,73 +213,6 @@ class _CategoryBreakdownRow extends StatelessWidget {
           Text(Formatters.currency(entry.total), style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
         ],
       ),
-    );
-  }
-}
-
-class _TrendChart extends ConsumerWidget {
-  const _TrendChart();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final trendAsync = ref.watch(analyticsTrendProvider);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return trendAsync.when(
-      loading: () => const SizedBox(height: 160, child: Center(child: CircularProgressIndicator())),
-      error: (e, _) => SizedBox(height: 80, child: Center(child: Text('Could not load trend: $e'))),
-      data: (trend) {
-        if (trend.series.isEmpty) {
-          return const SizedBox(height: 80, child: Center(child: Text('No data')));
-        }
-
-        final maxY = trend.series.map((p) => p.total).reduce((a, b) => a > b ? a : b);
-
-        return SizedBox(
-          height: 180,
-          child: BarChart(
-            BarChartData(
-              maxY: maxY == 0 ? 1 : maxY * 1.2,
-              gridData: const FlGridData(show: false),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index < 0 || index >= trend.series.length) return const SizedBox.shrink();
-                      final bucket = trend.series[index].bucket;
-                      final label = trend.bucketUnit == 'month' ? Formatters.monthYear(bucket) : Formatters.dayMonth(bucket);
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(label, style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant)),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              barGroups: [
-                for (var i = 0; i < trend.series.length; i++)
-                  BarChartGroupData(
-                    x: i,
-                    barRods: [
-                      BarChartRodData(
-                        toY: trend.series[i].total,
-                        color: colorScheme.primary,
-                        width: 14,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
