@@ -46,7 +46,7 @@ feature — `app.dart` resolves `AccentColorOption` to a `Color` first. See
 | Purple | `#7C3AED` | `#C4B5FD` |
 | Pink | `#DB2777` | `#F9A8D4` |
 | Teal | `#0F766E` | `#5EEAD4` |
-| Gold | `#B45309` | `#FCD34D` |
+| Yellow | `#CA8A04` | `#FDE047` | was an amber/brown tone that read too close to the default terracotta accent — shifted to a true yellow hue in both modes. |
 | Black & white | `#44403C` | `#D6D3D1` | for anyone who doesn't want a color accent — renders as warm-toned grey instead of a hue. |
 
 **Category colors & icons** — categories are user-CRUD-able (see

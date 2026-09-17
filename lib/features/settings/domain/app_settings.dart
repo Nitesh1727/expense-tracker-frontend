@@ -92,7 +92,7 @@ enum AccentColorOption {
         AccentColorOption.purple => 'Purple',
         AccentColorOption.pink => 'Pink',
         AccentColorOption.teal => 'Teal',
-        AccentColorOption.gold => 'Gold',
+        AccentColorOption.gold => 'Yellow',
         AccentColorOption.monochrome => 'Black & white',
       };
 }

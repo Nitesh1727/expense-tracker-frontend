@@ -52,8 +52,12 @@ class AppColors {
   static const accentPinkDark = Color(0xFFF9A8D4);
   static const accentTealLight = Color(0xFF0F766E);
   static const accentTealDark = Color(0xFF5EEAD4);
-  static const accentGoldLight = Color(0xFFB45309);
-  static const accentGoldDark = Color(0xFFFCD34D);
+  // Was an amber/brown tone (#B45309) that read as "brown" in light mode —
+  // too close to the default terracotta accent, which is also a brown-
+  // adjacent hue. Shifted to a true yellow hue (not just a lighter amber) in
+  // both modes so it reads as a genuinely distinct color choice.
+  static const accentGoldLight = Color(0xFFCA8A04);
+  static const accentGoldDark = Color(0xFFFDE047);
 
   /// "No color" option for anyone who doesn't want a color accent at all —
   /// renders the Home tile (and every other primary-colored element) in

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_bar_title.dart';
 import '../../../core/widgets/picker_dot.dart';
@@ -117,13 +118,21 @@ class SettingsScreen extends ConsumerWidget {
                     onChanged: (value) {
                       if (value != null) ref.read(settingsControllerProvider.notifier).setFont(value);
                     },
+                    // GoogleFonts.getFont, not a plain TextStyle(fontFamily: ...) — a raw
+                    // TextStyle only sets the family *name* Flutter looks for, it doesn't
+                    // load the font, so every row silently fell back to the same default
+                    // typeface instead of actually previewing its own font.
                     title: Text(
                       option.fontFamily,
-                      style: TextStyle(fontFamily: option.fontFamily, fontSize: 16, color: colorScheme.onSurface),
+                      style: GoogleFonts.getFont(
+                        option.fontFamily,
+                        fontSize: 16,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
                     subtitle: Text(
                       'The quick brown fox jumps',
-                      style: TextStyle(fontFamily: option.fontFamily, color: colorScheme.onSurfaceVariant),
+                      style: GoogleFonts.getFont(option.fontFamily, color: colorScheme.onSurfaceVariant),
                     ),
                   ),
                   if (option != AppFontOption.values.last) const Divider(height: 1),
