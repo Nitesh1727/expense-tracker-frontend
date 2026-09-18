@@ -19,8 +19,18 @@ import '../expense_providers.dart';
 /// (or "Clear filters", which resets and applies immediately) — see
 /// ExpenseHistoryFilter for why the draft isn't just written straight to
 /// the provider on every tap.
-Future<void> showExpenseHistoryFilterSheet(BuildContext context) {
-  return showGlassBottomSheet(context, builder: (context) => const _ExpenseHistoryFilterSheet());
+///
+/// Returns `true` if "Apply" was pressed, `false` if "Clear filters" was, or
+/// `null` if the sheet was dismissed without either (back gesture, tap
+/// outside). The caller needs this distinction, not just "did the provider
+/// change" — pressing Apply while "All categories"/"All time" are still the
+/// selected defaults is a real, explicit choice to browse everything, which
+/// reads differently from the sheet never having been touched at all (see
+/// ExpenseSearchScreen, which shows a "search your expenses" prompt in the
+/// untouched case but actual results — everything, unfiltered — once Apply
+/// has genuinely been pressed).
+Future<bool?> showExpenseHistoryFilterSheet(BuildContext context) {
+  return showGlassBottomSheet<bool>(context, builder: (context) => const _ExpenseHistoryFilterSheet());
 }
 
 class _ExpenseHistoryFilterSheet extends ConsumerStatefulWidget {
@@ -31,20 +41,29 @@ class _ExpenseHistoryFilterSheet extends ConsumerStatefulWidget {
 }
 
 class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilterSheet> {
-  late Set<String> _categoryIds;
-  late HistoryPeriodPreset _period;
+  // Both nullable — `null` means "the user hasn't tapped anything in this
+  // group yet", rendered with *no* chip highlighted (not even "All"/
+  // "All time"), per explicit user feedback that pre-selecting those by
+  // default looked like a choice had already been made. Only populated
+  // from the current filter if it was actually applied before (re-opening
+  // Filters after a previous Apply correctly shows what you picked, rather
+  // than blanking out every time).
+  Set<String>? _categoryIds;
+  HistoryPeriodPreset? _period;
   DateTime? _customFrom;
   DateTime? _customTo; // exclusive, but stored/shown as the inclusive last day minus a day — see _pickCustomRange
 
   @override
   void initState() {
     super.initState();
-    final current = ref.read(expenseHistoryFilterProvider);
-    _categoryIds = {...current.categoryIds};
-    _period = current.period;
-    if (current.period == HistoryPeriodPreset.custom) {
-      _customFrom = current.from;
-      _customTo = current.to;
+    if (ref.read(expenseFiltersEverAppliedProvider)) {
+      final current = ref.read(expenseHistoryFilterProvider);
+      _categoryIds = {...current.categoryIds};
+      _period = current.period;
+      if (current.period == HistoryPeriodPreset.custom) {
+        _customFrom = current.from;
+        _customTo = current.to;
+      }
     }
   }
 
@@ -72,21 +91,27 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
   }
 
   void _apply() {
-    final (from, to) = switch (_period) {
+    // Nothing tapped in a group defaults to "All"/"All time" — pressing
+    // Apply at all is the explicit choice, even if every individual chip
+    // is still at its untouched default.
+    final period = _period ?? HistoryPeriodPreset.all;
+    final categoryIds = _categoryIds ?? const <String>{};
+
+    final (from, to) = switch (period) {
       HistoryPeriodPreset.custom => (_customFrom, _customTo),
       HistoryPeriodPreset.all => (null, null),
-      _ => ExpenseHistoryFilter.rangeFor(_period) ?? (null, null),
+      _ => ExpenseHistoryFilter.rangeFor(period) ?? (null, null),
     };
 
     ref.read(expenseHistoryFilterProvider.notifier).set(
-          ExpenseHistoryFilter(categoryIds: _categoryIds, period: _period, from: from, to: to),
+          ExpenseHistoryFilter(categoryIds: categoryIds, period: period, from: from, to: to),
         );
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(true);
   }
 
   void _clear() {
     ref.read(expenseHistoryFilterProvider.notifier).set(const ExpenseHistoryFilter());
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(false);
   }
 
   @override
@@ -121,21 +146,25 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
                     // "All" clears the whole set rather than being one more
                     // toggle among many — selecting any specific category
                     // while "All" is also selected wouldn't mean anything.
+                    // Only highlighted once explicitly tapped (`_categoryIds`
+                    // non-null and empty) — not just because nothing else
+                    // happens to be selected yet.
                     ChoiceChip(
                       label: const Text('All'),
-                      selected: _categoryIds.isEmpty,
-                      onSelected: (_) => setState(() => _categoryIds.clear()),
+                      selected: _categoryIds != null && _categoryIds!.isEmpty,
+                      onSelected: (_) => setState(() => _categoryIds = {}),
                     ),
                     for (final category in categories)
                       FilterChip(
                         avatar: CategoryAvatar(icon: category.icon, colorHex: category.color, size: 20),
                         label: Text(category.name),
-                        selected: _categoryIds.contains(category.id),
+                        selected: _categoryIds?.contains(category.id) ?? false,
                         onSelected: (selected) => setState(() {
+                          _categoryIds ??= {};
                           if (selected) {
-                            _categoryIds.add(category.id);
+                            _categoryIds!.add(category.id);
                           } else {
-                            _categoryIds.remove(category.id);
+                            _categoryIds!.remove(category.id);
                           }
                         }),
                       ),
@@ -145,6 +174,8 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
               const SizedBox(height: AppSpacing.lg),
               Text('Time period', style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant)),
               const SizedBox(height: AppSpacing.sm),
+              // No chip highlighted (including "All time") until one is
+              // explicitly tapped — `_period == null` means untouched.
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,

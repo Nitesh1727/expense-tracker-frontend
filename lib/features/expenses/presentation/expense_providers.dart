@@ -24,15 +24,27 @@ class HomeFeedController extends AsyncNotifier<DailySummaryResult> {
 
   Future<void> loadMore() async {
     final current = state.value;
-    if (current == null || !current.hasMore) return;
+    // The `isLoadingMore` check guards against the scroll listener firing
+    // loadMore() again before the first call resolves — without it, fast/
+    // continuous scrolling could fire several overlapping fetches for the
+    // same next page.
+    if (current == null || !current.hasMore || current.isLoadingMore) return;
 
-    final next = await ref.read(expenseApiProvider).dailySummary(page: current.page + 1, limit: _pageSize);
-    state = AsyncData(DailySummaryResult(
-      days: [...current.days, ...next.days],
-      page: next.page,
-      limit: next.limit,
-      hasMore: next.hasMore,
-    ));
+    state = AsyncData(current.copyWith(isLoadingMore: true));
+    try {
+      final next = await ref.read(expenseApiProvider).dailySummary(page: current.page + 1, limit: _pageSize);
+      state = AsyncData(DailySummaryResult(
+        days: [...current.days, ...next.days],
+        page: next.page,
+        limit: next.limit,
+        hasMore: next.hasMore,
+        totalAmount: next.totalAmount,
+      ));
+    } catch (_) {
+      // Clears the loading flag so scrolling again retries instead of being
+      // stuck behind a permanently-stalled spinner after a failed fetch.
+      state = AsyncData(current.copyWith(isLoadingMore: false));
+    }
   }
 }
 
@@ -45,6 +57,18 @@ final homeFeedControllerProvider = AsyncNotifierProvider<HomeFeedController, Dai
 /// reopened, and so ExpenseHistoryFilterSheet (opened from Search) can read/
 /// write it without a reference to the screen itself.
 final expenseHistoryFilterProvider = simpleValueProvider<ExpenseHistoryFilter>(const ExpenseHistoryFilter());
+
+/// Whether the Filters sheet has actually been applied at least once —
+/// distinct from `expenseHistoryFilterProvider.isActive`, which is false
+/// both for "never touched" *and* for an explicit "All categories, All
+/// time" choice. Those need to read differently (see ExpenseSearchScreen:
+/// the former shows a "search your expenses" prompt, the latter shows every
+/// expense, unfiltered) per explicit user feedback that pressing Apply on
+/// the untouched defaults did nothing. Lives in a provider rather than
+/// local screen state for the same reason expenseHistoryFilterProvider
+/// does — it needs to survive the Search screen being popped and reopened,
+/// not silently reset to "pristine" every time.
+final expenseFiltersEverAppliedProvider = simpleValueProvider<bool>(false);
 
 /// Create/update/delete live here rather than on any list controller, since
 /// a mutation needs to refresh *every* place a total could be showing (Home,

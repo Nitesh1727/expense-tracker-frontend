@@ -269,7 +269,34 @@ something reached constantly like the 3 tabs are.
   `expenseHistoryFilterProvider` so it works the same regardless of which
   screen opens it. Results view: no text query shows the same grouped
   day-tiles Home uses (reuses `DayTile` directly), scoped to whatever
-  category/period filter is active; a text query shows a flat list of
-  matches with a running total instead — see the screen's own doc comment
-  for why. Not paginated with "load more" — a deliberate scope choice,
-  search/filter results are typically a narrower slice of history already.
+  category/period filter is active, plus a "Total" footer (the grand total
+  across every matching day, not just the ones loaded — see
+  `DailySummaryResult.totalAmount`); a text query shows a flat list of
+  matches with the same running total instead — see the screen's own doc
+  comment for why. Both views are paginated with "load more" on scroll
+  (20 expenses / 15 days per page, matching Home's day-tile page size) —
+  per explicit user feedback that a single unbounded fetch wouldn't scale
+  for someone with a lot of history.
+- **Filters sheet defaults to nothing selected**, not "All"/"All time"
+  pre-highlighted — per explicit user feedback that pre-checking those
+  looked like a choice had already been made, and pressing Apply against
+  those defaults appeared to do nothing (`filter.isActive` alone can't
+  distinguish "untouched" from "explicitly chose All/All time", so a
+  sibling provider, `expenseFiltersEverAppliedProvider`, tracks whether
+  Apply has actually been pressed at least once). The sheet's own draft
+  state (`_categoryIds`/`_period` in `expense_history_filter_sheet.dart`)
+  is nullable for the same reason — `null` renders with no chip
+  highlighted; pressing Apply with nothing touched defaults both to "All".
+- **Pagination loading state is a field on the result, not derived from
+  `hasMore`** (`DailySummaryResult.isLoadingMore` / `ExpenseListResult.
+  isLoadingMore`, used by Home's day-tile feed and both of Search's
+  results views) — `hasMore` stays true the whole time more pages *exist*,
+  whether or not one is currently being fetched, which was the actual
+  cause of a reported jank: scrolling into blank space at the bottom
+  before the next page arrived, then the list visibly jumping once it
+  did. Setting `isLoadingMore: true` before a `loadMore()` fetch and
+  false after means the loading row appears exactly when a fetch starts —
+  well before the user reaches genuinely blank space, since the scroll
+  listener triggers loadMore() 300px before the true bottom — and doubles
+  as a re-entrancy guard against firing overlapping fetches for the same
+  next page during fast/continuous scrolling.

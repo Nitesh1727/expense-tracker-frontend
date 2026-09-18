@@ -16,7 +16,12 @@ class Formatters {
 
   static String currency(double amount) => _currency.format(amount);
 
-  static String dayMonth(DateTime date) => _dayMonth.format(date);
+  /// "14 Sep" for the current year, "14 Sep 2025" otherwise — every
+  /// expense-date display in the app routes through this one formatter, so
+  /// fixing it here is enough for dates from a previous year to stop
+  /// silently reading as if they were from this year everywhere at once.
+  static String dayMonth(DateTime date) =>
+      date.year == DateTime.now().year ? _dayMonth.format(date) : _dayMonthYear.format(date);
   static String dayMonthYear(DateTime date) => _dayMonthYear.format(date);
   static String monthYear(DateTime date) => _monthYear.format(date);
   static String weekday(DateTime date) => _weekday.format(date);

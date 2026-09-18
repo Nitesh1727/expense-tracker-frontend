@@ -11,6 +11,9 @@ class ExpenseListResult {
   // not just the items loaded so far — lets the History screen show an
   // accurate running total without needing every page fetched first.
   final double totalAmount;
+  // UI-only transient flag — see DailySummaryResult.isLoadingMore for why
+  // this drives the bottom loading row instead of `hasMore`.
+  final bool isLoadingMore;
 
   ExpenseListResult({
     required this.items,
@@ -18,9 +21,19 @@ class ExpenseListResult {
     required this.limit,
     required this.total,
     required this.totalAmount,
+    this.isLoadingMore = false,
   });
 
   bool get hasMore => items.length + (page - 1) * limit < total;
+
+  ExpenseListResult copyWith({bool? isLoadingMore}) => ExpenseListResult(
+        items: items,
+        page: page,
+        limit: limit,
+        total: total,
+        totalAmount: totalAmount,
+        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      );
 }
 
 class DailySummaryResult {
@@ -28,8 +41,37 @@ class DailySummaryResult {
   final int page;
   final int limit;
   final bool hasMore;
+  // Sum across every matching day, not just the days loaded so far — lets
+  // the Search screen's grouped-by-day view show an accurate total without
+  // needing every page fetched first.
+  final double totalAmount;
+  // UI-only transient flag, not part of the API response — true only while
+  // a "load more" fetch is actually in flight. Rendering the bottom loading
+  // row off of this (rather than off `hasMore`, which stays true the whole
+  // time more pages *exist* whether or not one is currently being fetched)
+  // is what fixes the "list scrolls into blank space, then jumps once data
+  // arrives" pagination jank: the spinner now appears exactly when a fetch
+  // starts, not only once the user has already scrolled past everything
+  // that was loaded.
+  final bool isLoadingMore;
 
-  DailySummaryResult({required this.days, required this.page, required this.limit, required this.hasMore});
+  DailySummaryResult({
+    required this.days,
+    required this.page,
+    required this.limit,
+    required this.hasMore,
+    required this.totalAmount,
+    this.isLoadingMore = false,
+  });
+
+  DailySummaryResult copyWith({bool? isLoadingMore}) => DailySummaryResult(
+        days: days,
+        page: page,
+        limit: limit,
+        hasMore: hasMore,
+        totalAmount: totalAmount,
+        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      );
 }
 
 /// A DateTime serialized without `.toUtc()` first sends ambiguous wall-clock
@@ -102,6 +144,7 @@ class ExpenseApi {
         page: res.data['page'] as int,
         limit: res.data['limit'] as int,
         hasMore: res.data['hasMore'] as bool,
+        totalAmount: (res.data['totalAmount'] as num).toDouble(),
       );
     } catch (e) {
       throw ApiClient.toApiException(e);

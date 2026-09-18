@@ -24,25 +24,35 @@ import 'widgets/expense_tile.dart';
 /// custom range) is the exact same [showExpenseHistoryFilterSheet] widget,
 /// reused as-is rather than duplicated — its state lives in
 /// [expenseHistoryFilterProvider] so it round-trips correctly regardless of
-/// which screen opens the sheet.
+/// which screen opens the sheet. A sibling provider,
+/// [expenseFiltersEverAppliedProvider], tracks whether Apply has actually
+/// been pressed at least once — `filter.isActive` alone can't distinguish
+/// the untouched default state from an explicit "All categories, All time"
+/// choice, and those need to read differently (a "search your expenses"
+/// prompt vs. every expense, unfiltered) per explicit user feedback that
+/// pressing Apply on the untouched defaults appeared to do nothing.
 ///
 /// Two distinct results views — see [_wantsFlatList]:
 /// - **Time period only, or no filter at all**: the same grouped day-tiles
 ///   Home uses (literally reuses [DayTile], passing the active category
 ///   filter — empty in this branch — through to its own per-day fetch too)
 ///   — "show me what I spent these dates" reads naturally as the familiar
-///   day-grouped view, not a flat list.
+///   day-grouped view, not a flat list. Also shows a "Total" footer, same
+///   as the flat list — the grand total across every matching day, not
+///   just the ones loaded so far (see DailySummaryResult.totalAmount).
 /// - **A category filter and/or a text query is active**: a flat list of
 ///   matching expenses directly instead — "all Food expenses" or "all Pizza
 ///   this month" is about reading the specific matches, not browsing by day.
 ///   Per explicit user feedback: day-tiles should only appear for a pure
 ///   time-period browse, not once something more specific is being asked for.
 ///
-/// Deliberately not paginated with "load more" like a full history list
-/// would be — search results are typically a narrower slice already; this
-/// fetches one generous page (the max the backend allows) rather than
-/// adding a second parallel infinite-scroll mode on top of an already
-/// dual-mode screen.
+/// Both views are paginated with "load more" on scroll (same pattern as
+/// Home's day-tile feed) — per explicit user feedback that a single
+/// unbounded fetch wouldn't scale once someone has a lot of history. The
+/// bottom loading row is driven by `isLoadingMore` (a fetch actually in
+/// flight), not just "more could be fetched" — see
+/// DailySummaryResult/ExpenseListResult.isLoadingMore for why that
+/// distinction is what avoids a scroll-into-blank-space jank.
 class ExpenseSearchScreen extends ConsumerStatefulWidget {
   const ExpenseSearchScreen({super.key});
 
@@ -51,8 +61,12 @@ class ExpenseSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
+  static const _listPageSize = 20;
+  static const _dailyPageSize = 15;
+
   final _queryController = TextEditingController();
   final _queryFocusNode = FocusNode();
+  final _scrollController = ScrollController();
   Timer? _debounce;
 
   String _query = '';
@@ -75,6 +89,11 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusOnceSheetSettles());
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels > _scrollController.position.maxScrollExtent - 300) {
+        _loadMore();
+      }
+    });
   }
 
   // Same reasoning as the add-expense sheet's amount field — requesting the
@@ -99,6 +118,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     _debounce?.cancel();
     _queryController.dispose();
     _queryFocusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -110,9 +130,14 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     });
   }
 
+  /// Always fetches page 1, discarding whatever extra pages loadMore() had
+  /// appended — the right behavior any time the query, filter, or an
+  /// edit/delete means the previous results are stale, since restarting
+  /// pagination from the top is the only way to guarantee correctness.
   Future<void> _runSearch() async {
     final filter = ref.read(expenseHistoryFilterProvider);
-    if (!_hasQuery && !filter.isActive) {
+    final filtersApplied = ref.read(expenseFiltersEverAppliedProvider);
+    if (!_hasQuery && !filtersApplied) {
       setState(() {
         _dailyResult = null;
         _listResult = null;
@@ -133,7 +158,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
               categoryIds: filter.categoryIds.toList(),
               from: filter.from,
               to: filter.to,
-              limit: 100,
+              limit: _listPageSize,
             );
         if (!mounted) return;
         setState(() {
@@ -146,7 +171,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
               categoryIds: filter.categoryIds.toList(),
               from: filter.from,
               to: filter.to,
-              limit: 60,
+              limit: _dailyPageSize,
             );
         if (!mounted) return;
         setState(() {
@@ -165,10 +190,77 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     }
   }
 
+  /// Fetches the next page and appends it, for whichever results view is
+  /// currently showing. Guarded by `isLoadingMore` so fast/continuous
+  /// scrolling can't fire several overlapping fetches for the same page.
+  Future<void> _loadMore() async {
+    final filter = ref.read(expenseHistoryFilterProvider);
+
+    if (_wantsFlatList(filter)) {
+      final current = _listResult;
+      if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+      setState(() => _listResult = current.copyWith(isLoadingMore: true));
+      try {
+        final next = await ref.read(expenseApiProvider).list(
+              q: _hasQuery ? _query.trim() : null,
+              categoryIds: filter.categoryIds.toList(),
+              from: filter.from,
+              to: filter.to,
+              page: current.page + 1,
+              limit: _listPageSize,
+            );
+        if (!mounted) return;
+        setState(() {
+          _listResult = ExpenseListResult(
+            items: [...current.items, ...next.items],
+            page: next.page,
+            limit: next.limit,
+            total: next.total,
+            totalAmount: next.totalAmount,
+          );
+        });
+      } catch (_) {
+        if (!mounted) return;
+        // Clears the loading flag so scrolling again retries, instead of
+        // being stuck behind a permanently-stalled spinner after a failed
+        // fetch.
+        setState(() => _listResult = current.copyWith(isLoadingMore: false));
+      }
+    } else {
+      final current = _dailyResult;
+      if (current == null || !current.hasMore || current.isLoadingMore) return;
+
+      setState(() => _dailyResult = current.copyWith(isLoadingMore: true));
+      try {
+        final next = await ref.read(expenseApiProvider).dailySummary(
+              categoryIds: filter.categoryIds.toList(),
+              from: filter.from,
+              to: filter.to,
+              page: current.page + 1,
+              limit: _dailyPageSize,
+            );
+        if (!mounted) return;
+        setState(() {
+          _dailyResult = DailySummaryResult(
+            days: [...current.days, ...next.days],
+            page: next.page,
+            limit: next.limit,
+            hasMore: next.hasMore,
+            totalAmount: next.totalAmount,
+          );
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _dailyResult = current.copyWith(isLoadingMore: false));
+      }
+    }
+  }
+
   Future<void> _openFilters() async {
-    await showExpenseHistoryFilterSheet(context);
-    // Whether Apply, Clear, or a back-gesture closed it — re-running is a
-    // harmless no-op if nothing actually changed.
+    final result = await showExpenseHistoryFilterSheet(context);
+    if (result == null) return; // dismissed without Apply or Clear — leave everything as-is
+    ref.read(expenseFiltersEverAppliedProvider.notifier).set(result); // true for Apply, false for Clear
     _runSearch();
   }
 
@@ -213,6 +305,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final filter = ref.watch(expenseHistoryFilterProvider);
+    final filtersApplied = ref.watch(expenseFiltersEverAppliedProvider);
     final categories = ref.watch(categoryControllerProvider).value ?? const [];
 
     return Scaffold(
@@ -275,6 +368,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
                         InkWell(
                           onTap: () {
                             ref.read(expenseHistoryFilterProvider.notifier).set(const ExpenseHistoryFilter());
+                            ref.read(expenseFiltersEverAppliedProvider.notifier).set(false);
                             _runSearch();
                           },
                           child: Icon(Icons.close, size: 14, color: colorScheme.primary),
@@ -286,17 +380,17 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
               ),
             ),
           const SizedBox(height: AppSpacing.sm),
-          Expanded(child: _buildResults(context, filter)),
+          Expanded(child: _buildResults(context, filter, filtersApplied)),
         ],
       ),
     );
   }
 
-  Widget _buildResults(BuildContext context, ExpenseHistoryFilter filter) {
+  Widget _buildResults(BuildContext context, ExpenseHistoryFilter filter, bool filtersApplied) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (!_hasQuery && !filter.isActive) {
+    if (!_hasQuery && !filtersApplied) {
       return const EmptyState(
         icon: Icons.search,
         title: 'Search your expenses',
@@ -307,19 +401,51 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return Center(child: Text('Could not search: $_error'));
 
-    // Time-period-only (or no) filter: same grouped day-tile view as Home.
-    // A category filter or text query switches to the flat list below —
-    // see _wantsFlatList.
+    Widget totalFooter(double totalAmount) => Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Divider(color: colorScheme.outline),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Total', style: textTheme.titleMedium),
+                  Text(Formatters.currency(totalAmount), style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+            ],
+          ),
+        );
+
+    const loadingMoreRow = Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+      child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+    );
+
+    // Time-period-only (or no) filter: same grouped day-tile view as Home,
+    // plus a "Total" footer (the flat list below already had one).
     if (!_wantsFlatList(filter)) {
-      final days = _dailyResult?.days ?? const [];
+      final result = _dailyResult;
+      final days = result?.days ?? const [];
       if (days.isEmpty) {
         return const EmptyState(icon: Icons.receipt_long_outlined, title: 'Nothing logged for this filter');
       }
-      return ListView(
+      final isLoadingMore = result?.isLoadingMore ?? false;
+      return ListView.builder(
+        controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-        children: [
-          for (final day in days)
-            Padding(
+        // +1 for the loading row (only while a next page is actually being
+        // fetched) and +1 for the total footer, which always renders last —
+        // the total is already known in full from `totalAmount`, it doesn't
+        // need every page loaded first.
+        itemCount: days.length + (isLoadingMore ? 1 : 0) + 1,
+        itemBuilder: (context, index) {
+          if (index < days.length) {
+            final day = days[index];
+            return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: DayTile(
                 key: ValueKey(day.date.toIso8601String()),
@@ -327,21 +453,27 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
                 categoryIds: filter.categoryIds,
                 onExpenseChanged: _runSearch,
               ),
-            ),
-        ],
+            );
+          }
+          if (isLoadingMore && index == days.length) return loadingMoreRow;
+          return totalFooter(result!.totalAmount);
+        },
       );
     }
 
     // Category filter and/or text query: a flat list of matches, not
     // grouped by day.
-    final items = _listResult?.items ?? const [];
+    final result = _listResult;
+    final items = result?.items ?? const [];
     if (items.isEmpty) {
       return const EmptyState(icon: Icons.search_off, title: 'No matching expenses', subtitle: 'Try a different search or filter.');
     }
+    final isLoadingMore = result?.isLoadingMore ?? false;
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-      itemCount: items.length + 1, // +1 for the total footer
+      itemCount: items.length + (isLoadingMore ? 1 : 0) + 1,
       itemBuilder: (context, index) {
         if (index < items.length) {
           final expense = items[index];
@@ -357,28 +489,8 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
             child: ExpenseTile(expense: expense, onTap: () => _editExpense(expense)),
           );
         }
-
-        return Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Divider(color: colorScheme.outline),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total', style: textTheme.titleMedium),
-                  Text(
-                    Formatters.currency(_listResult!.totalAmount),
-                    style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
-            ],
-          ),
-        );
+        if (isLoadingMore && index == items.length) return loadingMoreRow;
+        return totalFooter(result!.totalAmount);
       },
     );
   }

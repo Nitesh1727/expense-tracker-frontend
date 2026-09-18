@@ -120,7 +120,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           .fadeIn(duration: 200.ms, delay: (i * 20).ms)
                           .slideY(begin: 0.02, end: 0),
                     ),
-                  if (feed.hasMore)
+                  // Tied to isLoadingMore (a fetch actually in flight), not
+                  // hasMore (which stays true the whole time more pages
+                  // exist) — this is what fixes scrolling into blank space
+                  // before the next page arrives; the spinner now shows the
+                  // moment a fetch starts, since it starts well before the
+                  // user reaches the true bottom (see the scroll listener's
+                  // 300px threshold above).
+                  if (feed.isLoadingMore)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
                       child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
