@@ -46,14 +46,14 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     ref.read(analyticsAnchorProvider.notifier).set(_adjacentAnchor(period, start, forward: forward));
   }
 
-  Future<void> _exportRange({required DateTime from, required DateTime to}) async {
+  Future<void> _exportRange({required DateTime from, required DateTime to, required String label}) async {
     setState(() => _exporting = true);
     try {
       // `to` is exclusive everywhere in this API (see backend/docs/API.md) —
       // callers picking a calendar day range (a `range.end` from the
       // backend, or a date-range-picker's last day) add one day themselves
       // rather than this method guessing which case it's in.
-      await ref.read(exportControllerProvider.notifier).shareCsv(from: from, to: to);
+      await ref.read(exportControllerProvider.notifier).shareXlsx(from: from, to: to, label: label);
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not export expenses';
@@ -75,9 +75,13 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
     // The picker returns calendar days inclusive of both ends — add a day
     // to the end so the exclusive `to` boundary covers all of the last day.
-    final to = DateTime(picked.end.year, picked.end.month, picked.end.day).add(const Duration(days: 1));
+    final lastDay = DateTime(picked.end.year, picked.end.month, picked.end.day);
+    final to = lastDay.add(const Duration(days: 1));
     final from = DateTime(picked.start.year, picked.start.month, picked.start.day);
-    await _exportRange(from: from, to: to);
+    final label = from.year == lastDay.year && from.month == lastDay.month && from.day == lastDay.day
+        ? Formatters.dayMonthYear(from)
+        : '${Formatters.dayMonthYear(from)} – ${Formatters.dayMonthYear(lastDay)}';
+    await _exportRange(from: from, to: to, label: label);
   }
 
   @override
@@ -164,16 +168,29 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                     for (final entry in summary.byCategory) _CategoryBreakdownRow(entry: entry, total: summary.total),
                   const SizedBox(height: AppSpacing.xl),
                   FilledButton.icon(
-                    onPressed: _exporting ? null : () => _exportRange(from: summary.range.start, to: summary.range.end),
+                    // Defaults to whatever period is currently on screen
+                    // (the label above the total, e.g. "September 2026") —
+                    // "Choose a custom date range instead" below is where
+                    // that gets overridden, so the button itself doesn't
+                    // need to spell either behavior out in its own label.
+                    onPressed: _exporting
+                        ? null
+                        : () => _exportRange(
+                              from: summary.range.start,
+                              to: summary.range.end,
+                              label: Formatters.periodLabel(period, summary.range.start, summary.range.end),
+                            ),
                     icon: _exporting
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.ios_share_outlined),
-                    label: Text(_exporting ? 'Exporting...' : 'Export this period as CSV'),
+                    label: Text(_exporting ? 'Exporting...' : 'Export Excel Sheet'),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  Center(
+                  Align(
+                    alignment: Alignment.centerLeft,
                     child: TextButton(
                       onPressed: _exporting ? null : _exportCustomRange,
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
                       child: const Text('Choose a custom date range instead'),
                     ),
                   ),

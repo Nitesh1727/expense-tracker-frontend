@@ -209,9 +209,14 @@ something reached constantly like the 3 tabs are.
    merged into one per explicit user feedback. See "Component notes" below.
 2. **Analytics** — period selector (Day/Week/Month/Year) with prev/next
    navigation and a clear "which period" label, total in an `AmountTile`,
-   category breakdown list, CSV export (scoped to whatever period is showing,
-   or a custom date range). Deliberately no charts — removed per explicit
-   user feedback ("keep this simple").
+   category breakdown list, Excel (`.xlsx`) export (scoped to whatever period
+   is showing, or a custom date range) — see backend/docs/API.md's `/export`
+   entry for the workbook's shape (styled header, total row, by-category
+   breakdown sheet section). The export button just says "Export" — it
+   defaults to the period currently on screen, with "Choose a custom date
+   range instead" below it as the override, so the label doesn't need to
+   spell out which one it'll do. Deliberately no charts — removed per
+   explicit user feedback ("keep this simple").
 3. **Categories** — list of the user's categories with CRUD (add/edit/delete).
 
 **Profile** (pushed, not a tab) — account info + edit, display settings
@@ -229,7 +234,7 @@ something reached constantly like the 3 tabs are.
   total as the largest element on screen (`displayLarge`), category breakdown
   as a simple horizontal bar list or donut chart (`fl_chart`) below it.
 - **Custom date range picking** (Search's Filters sheet, Analytics'
-  custom-range CSV export) uses `pickFriendlyDateRange`
+  custom-range Excel export) uses `pickFriendlyDateRange`
   (`core/utils/friendly_date_range_picker.dart`) — a custom two-step dialog
   (start date, then end date, each a `CalendarDatePicker`, the same widget
   `showDatePicker` uses internally), not Flutter's built-in
