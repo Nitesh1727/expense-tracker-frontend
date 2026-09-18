@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_bar_title.dart';
@@ -37,16 +36,6 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _deleteExpense(String id) async {
-    try {
-      await ref.read(expenseMutationControllerProvider.notifier).delete(id);
-    } catch (e) {
-      if (!mounted) return;
-      final message = e is ApiException ? e.message : 'Could not delete expense';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-    }
   }
 
   String? _categoryName(String? categoryId, List<Category> categories) {
@@ -152,19 +141,14 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
                     itemBuilder: (context, index) {
                       if (index < result.items.length) {
                         final expense = result.items[index];
-                        return Dismissible(
+                        // No swipe-to-delete here — tapping opens the edit
+                        // sheet, which has its own delete action, so the
+                        // swipe gesture was a redundant second way to do the
+                        // same thing (per explicit user feedback).
+                        return ExpenseTile(
                           key: ValueKey(expense.id),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                            child: Icon(Icons.delete_outline, color: colorScheme.error),
-                          ),
-                          onDismissed: (_) => _deleteExpense(expense.id),
-                          child: ExpenseTile(
-                            expense: expense,
-                            onTap: () => showExpenseFormSheet(context, existing: expense),
-                          ),
+                          expense: expense,
+                          onTap: () => showExpenseFormSheet(context, existing: expense),
                         );
                       }
 
