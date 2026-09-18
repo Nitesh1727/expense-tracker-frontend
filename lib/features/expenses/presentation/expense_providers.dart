@@ -55,13 +55,13 @@ class ExpenseHistoryController extends AsyncNotifier<ExpenseListResult> {
   @override
   Future<ExpenseListResult> build() {
     final filter = ref.watch(expenseHistoryFilterProvider);
-    return ref.read(expenseApiProvider).list(categoryId: filter.categoryId, from: filter.from, to: filter.to, page: 1);
+    return ref.read(expenseApiProvider).list(categoryIds: filter.categoryIds.toList(), from: filter.from, to: filter.to, page: 1);
   }
 
   Future<void> refresh() async {
     final filter = ref.read(expenseHistoryFilterProvider);
     state = await AsyncValue.guard(
-      () => ref.read(expenseApiProvider).list(categoryId: filter.categoryId, from: filter.from, to: filter.to, page: 1),
+      () => ref.read(expenseApiProvider).list(categoryIds: filter.categoryIds.toList(), from: filter.from, to: filter.to, page: 1),
     );
   }
 
@@ -71,7 +71,7 @@ class ExpenseHistoryController extends AsyncNotifier<ExpenseListResult> {
 
     final filter = ref.read(expenseHistoryFilterProvider);
     final next = await ref.read(expenseApiProvider).list(
-          categoryId: filter.categoryId,
+          categoryIds: filter.categoryIds.toList(),
           from: filter.from,
           to: filter.to,
           page: current.page + 1,

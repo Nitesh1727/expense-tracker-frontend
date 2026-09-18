@@ -242,3 +242,16 @@ something reached constantly like the 3 tabs are.
   mind mid-flow, not just restart. Built as one dialog with internal step
   state rather than two independent `showDatePicker` calls specifically to
   make that Back button possible.
+- **History's Filters sheet category picker is multi-select** (`FilterChip`,
+  not `ChoiceChip`) — pick any number of categories, not just one or all.
+  "All" is its own chip that clears the whole selection rather than being
+  one more toggle among many. The backend's `GET /expenses` gained a
+  `categoryIds` query param (comma-separated, matched with `$in`) alongside
+  the existing singular `categoryId`, which other call sites (e.g. DayTile's
+  per-day fetch) still use unchanged.
+- **`HistoryPeriodPreset`** (the quick period chips shared by History's
+  Filters sheet and Search's date filter — see `expense_history_filter.dart`)
+  includes **Last month** alongside All time/Today/This week/This month/
+  Custom, added per explicit request as "the most commonly used" period
+  beyond the current one. Adding a case to that one enum is enough for it to
+  appear everywhere the preset chips are used, by construction.

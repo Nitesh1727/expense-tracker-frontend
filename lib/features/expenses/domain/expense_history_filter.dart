@@ -3,7 +3,7 @@
 /// this" by comparing computed from/to values back against what each preset
 /// would currently produce) so the filter sheet can unambiguously highlight
 /// which chip is selected.
-enum HistoryPeriodPreset { all, today, week, month, custom }
+enum HistoryPeriodPreset { all, today, week, month, lastMonth, custom }
 
 extension HistoryPeriodPresetLabel on HistoryPeriodPreset {
   String get label => switch (this) {
@@ -11,34 +11,29 @@ extension HistoryPeriodPresetLabel on HistoryPeriodPreset {
         HistoryPeriodPreset.today => 'Today',
         HistoryPeriodPreset.week => 'This week',
         HistoryPeriodPreset.month => 'This month',
+        HistoryPeriodPreset.lastMonth => 'Last month',
         HistoryPeriodPreset.custom => 'Custom',
       };
 }
 
-/// History screen's active filter — category and time period compose
+/// History screen's active filter — categories and time period compose
 /// (both apply together, not either/or). `from`/`to` are only meaningful
 /// when [period] isn't [HistoryPeriodPreset.all]; for [HistoryPeriodPreset.custom]
 /// they're whatever the user picked, for the other presets they're computed
 /// fresh each time the filter is applied (see ExpenseHistoryFilterSheet).
 class ExpenseHistoryFilter {
-  final String? categoryId; // null = All categories
+  final Set<String> categoryIds; // empty = All categories
   final HistoryPeriodPreset period;
   final DateTime? from;
   final DateTime? to; // exclusive, matching the API convention everywhere else
 
-  const ExpenseHistoryFilter({this.categoryId, this.period = HistoryPeriodPreset.all, this.from, this.to});
+  const ExpenseHistoryFilter({this.categoryIds = const {}, this.period = HistoryPeriodPreset.all, this.from, this.to});
 
-  bool get isActive => categoryId != null || period != HistoryPeriodPreset.all;
+  bool get isActive => categoryIds.isNotEmpty || period != HistoryPeriodPreset.all;
 
-  ExpenseHistoryFilter copyWith({
-    String? categoryId,
-    bool clearCategoryId = false,
-    HistoryPeriodPreset? period,
-    DateTime? from,
-    DateTime? to,
-  }) =>
+  ExpenseHistoryFilter copyWith({Set<String>? categoryIds, HistoryPeriodPreset? period, DateTime? from, DateTime? to}) =>
       ExpenseHistoryFilter(
-        categoryId: clearCategoryId ? null : (categoryId ?? this.categoryId),
+        categoryIds: categoryIds ?? this.categoryIds,
         period: period ?? this.period,
         from: from ?? this.from,
         to: to ?? this.to,
@@ -65,6 +60,10 @@ class ExpenseHistoryFilter {
       case HistoryPeriodPreset.month:
         final start = DateTime(today.year, today.month, 1);
         final end = DateTime(today.year, today.month + 1, 1);
+        return (start, end);
+      case HistoryPeriodPreset.lastMonth:
+        final start = DateTime(today.year, today.month - 1, 1);
+        final end = DateTime(today.year, today.month, 1);
         return (start, end);
       case HistoryPeriodPreset.all:
       case HistoryPeriodPreset.custom:

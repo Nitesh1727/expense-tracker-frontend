@@ -38,12 +38,15 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
     super.dispose();
   }
 
-  String? _categoryName(String? categoryId, List<Category> categories) {
-    if (categoryId == null) return null;
-    for (final category in categories) {
-      if (category.id == categoryId) return category.name;
-    }
-    return null;
+  /// A single name if one category is picked, a joined list for two, or a
+  /// count for three or more — keeps the filter-summary chip from growing
+  /// unboundedly long once several categories are selected.
+  String? _categoryNamesLabel(Set<String> categoryIds, List<Category> categories) {
+    if (categoryIds.isEmpty) return null;
+    final names = categories.where((c) => categoryIds.contains(c.id)).map((c) => c.name).toList();
+    if (names.isEmpty) return null;
+    if (names.length <= 2) return names.join(', ');
+    return '${names.length} categories';
   }
 
   String _filterSummary(ExpenseHistoryFilter filter, List<Category> categories) {
@@ -53,8 +56,8 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
     } else if (filter.period != HistoryPeriodPreset.all) {
       parts.add(filter.period.label);
     }
-    final categoryName = _categoryName(filter.categoryId, categories);
-    if (categoryName != null) parts.add(categoryName);
+    final categoryLabel = _categoryNamesLabel(filter.categoryIds, categories);
+    if (categoryLabel != null) parts.add(categoryLabel);
     return parts.join(' · ');
   }
 

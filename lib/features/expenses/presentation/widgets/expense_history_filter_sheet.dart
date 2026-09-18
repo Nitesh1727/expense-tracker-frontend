@@ -27,7 +27,7 @@ class _ExpenseHistoryFilterSheet extends ConsumerStatefulWidget {
 }
 
 class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilterSheet> {
-  late String? _categoryId;
+  late Set<String> _categoryIds;
   late HistoryPeriodPreset _period;
   DateTime? _customFrom;
   DateTime? _customTo; // exclusive, but stored/shown as the inclusive last day minus a day — see _pickCustomRange
@@ -36,7 +36,7 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
   void initState() {
     super.initState();
     final current = ref.read(expenseHistoryFilterProvider);
-    _categoryId = current.categoryId;
+    _categoryIds = {...current.categoryIds};
     _period = current.period;
     if (current.period == HistoryPeriodPreset.custom) {
       _customFrom = current.from;
@@ -75,7 +75,7 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
     };
 
     ref.read(expenseHistoryFilterProvider.notifier).set(
-          ExpenseHistoryFilter(categoryId: _categoryId, period: _period, from: from, to: to),
+          ExpenseHistoryFilter(categoryIds: _categoryIds, period: _period, from: from, to: to),
         );
     Navigator.of(context).pop();
   }
@@ -102,7 +102,10 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
             children: [
               Text('Filters', style: textTheme.titleLarge),
               const SizedBox(height: AppSpacing.lg),
-              Text('Category', style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant)),
+              Text(
+                'Category (pick any number)',
+                style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: AppSpacing.sm),
               categoriesAsync.when(
                 loading: () => const SizedBox(height: 36, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
@@ -111,17 +114,26 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
                   spacing: AppSpacing.sm,
                   runSpacing: AppSpacing.sm,
                   children: [
+                    // "All" clears the whole set rather than being one more
+                    // toggle among many — selecting any specific category
+                    // while "All" is also selected wouldn't mean anything.
                     ChoiceChip(
                       label: const Text('All'),
-                      selected: _categoryId == null,
-                      onSelected: (_) => setState(() => _categoryId = null),
+                      selected: _categoryIds.isEmpty,
+                      onSelected: (_) => setState(() => _categoryIds.clear()),
                     ),
                     for (final category in categories)
-                      ChoiceChip(
+                      FilterChip(
                         avatar: CategoryAvatar(icon: category.icon, colorHex: category.color, size: 20),
                         label: Text(category.name),
-                        selected: _categoryId == category.id,
-                        onSelected: (_) => setState(() => _categoryId = category.id),
+                        selected: _categoryIds.contains(category.id),
+                        onSelected: (selected) => setState(() {
+                          if (selected) {
+                            _categoryIds.add(category.id);
+                          } else {
+                            _categoryIds.remove(category.id);
+                          }
+                        }),
                       ),
                   ],
                 ),
