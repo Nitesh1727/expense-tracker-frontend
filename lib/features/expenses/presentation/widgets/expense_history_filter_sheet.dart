@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/friendly_date_range_picker.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/category_avatar.dart';
 import '../../../../core/widgets/glass_bottom_sheet.dart';
@@ -49,11 +50,11 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
         ? DateTimeRange(start: _customFrom!, end: _customTo!.subtract(const Duration(days: 1)))
         : DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
 
-    final picked = await showDateRangePicker(
-      context: context,
+    final picked = await pickFriendlyDateRange(
+      context,
       firstDate: DateTime(now.year - 5),
       lastDate: now,
-      initialDateRange: initial,
+      initial: initial,
     );
     if (picked == null || !mounted) return;
 

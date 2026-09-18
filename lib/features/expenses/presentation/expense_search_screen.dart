@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/friendly_date_range_picker.dart';
 import '../../../core/widgets/app_bar_title.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../data/expense_api.dart';
@@ -206,7 +207,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
                     focusNode: _queryFocusNode,
                     onChanged: _onQueryChanged,
                     decoration: const InputDecoration(
-                      hintText: 'Search by description or amount',
+                      hintText: 'Description / amount',
                       prefixIcon: Icon(Icons.search),
                       isDense: true,
                     ),
@@ -378,11 +379,11 @@ class _PeriodPickerSheetState extends State<_PeriodPickerSheet> {
         ? DateTimeRange(start: _customFrom!, end: _customTo!.subtract(const Duration(days: 1)))
         : DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
 
-    final picked = await showDateRangePicker(
-      context: context,
+    final picked = await pickFriendlyDateRange(
+      context,
       firstDate: DateTime(now.year - 5),
       lastDate: now,
-      initialDateRange: initial,
+      initial: initial,
     );
     if (picked == null || !mounted) return;
 

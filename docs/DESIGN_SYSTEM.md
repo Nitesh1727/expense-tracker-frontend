@@ -225,3 +225,20 @@ something reached constantly like the 3 tabs are.
 - **Analytics**: period selector as a segmented control (Day/Week/Month/Year),
   total as the largest element on screen (`displayLarge`), category breakdown
   as a simple horizontal bar list or donut chart (`fl_chart`) below it.
+- **Custom date range picking** (History's Filters sheet, Search's date
+  filter, Analytics' custom-range CSV export) uses `pickFriendlyDateRange`
+  (`core/utils/friendly_date_range_picker.dart`) — a custom two-step dialog
+  (start date, then end date, each a `CalendarDatePicker`, the same widget
+  `showDatePicker` uses internally), not Flutter's built-in
+  `showDateRangePicker`. The stock range picker's calendar view requires
+  knowing you tap twice on one grid to define a range, and its "switch to
+  typing" pencil icon is easy to land on by accident, after which you're
+  stuck typing a date in a strict format instead of picking one visually —
+  replaced per explicit user feedback that customers found it hard to use.
+  Each step says explicitly what step it is and what happens next ("you'll
+  pick an end date next"), and the end-date step has a **Back** button to
+  revisit the start date without cancelling the whole flow and starting
+  over — also explicit feedback: people need to be able to change their
+  mind mid-flow, not just restart. Built as one dialog with internal step
+  state rather than two independent `showDatePicker` calls specifically to
+  make that Back button possible.

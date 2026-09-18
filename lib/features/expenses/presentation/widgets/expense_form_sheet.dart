@@ -92,6 +92,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
       initialDate: _date,
       firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
       lastDate: DateTime.now(),
+      initialEntryMode: DatePickerEntryMode.calendar,
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -205,7 +206,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                 TextFormField(
                   controller: _descriptionController,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(labelText: 'Description', hintText: 'e.g. Lunch with team'),
+                  decoration: const InputDecoration(labelText: 'Description', hintText: 'e.g. Pizza, Uber ride'),
                   validator: (value) => (value?.trim().isEmpty ?? true) ? 'Add a short description' : null,
                 ),
                 const SizedBox(height: AppSpacing.md),

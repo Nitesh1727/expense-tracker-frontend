@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/friendly_date_range_picker.dart';
 import '../../../core/widgets/amount_tile.dart';
 import '../../../core/widgets/category_avatar.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -64,11 +65,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
   Future<void> _exportCustomRange() async {
     final now = DateTime.now();
-    final picked = await showDateRangePicker(
-      context: context,
+    final picked = await pickFriendlyDateRange(
+      context,
       firstDate: DateTime(now.year - 5),
       lastDate: now,
-      initialDateRange: DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now),
+      initial: DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now),
     );
     if (picked == null || !mounted) return;
 
