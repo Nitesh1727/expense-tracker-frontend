@@ -35,6 +35,9 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
   Future<void> _verify() async {
     if (_codeController.text.trim().length != 6) return;
 
+    // See EmailAuthScreen._submit — clears a stale error from a previous
+    // failed attempt so it can't linger onto the screen this navigates to.
+    ScaffoldMessenger.of(context).clearSnackBars();
     setState(() => _verifying = true);
     try {
       final result = await ref.read(authControllerProvider.notifier).verifyOtp(widget.phone, _codeController.text.trim());

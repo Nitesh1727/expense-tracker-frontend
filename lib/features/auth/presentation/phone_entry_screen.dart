@@ -38,6 +38,9 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
+    // See EmailAuthScreen._submit — clears a stale error from a previous
+    // failed attempt so it can't linger onto the screen this navigates to.
+    ScaffoldMessenger.of(context).clearSnackBars();
     setState(() => _submitting = true);
     final phone = _phoneController.text.trim();
 

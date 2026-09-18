@@ -36,6 +36,12 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
+    // Clears any error SnackBar left over from a previous failed attempt —
+    // ScaffoldMessenger is shared app-wide, so without this a stale "wrong
+    // password" banner from a first try could still be mid-display (its
+    // default duration) when a fast retry succeeds and navigates to Home,
+    // making it look like login failed even though it just succeeded.
+    ScaffoldMessenger.of(context).clearSnackBars();
     setState(() => _submitting = true);
     final email = _emailController.text.trim();
     final password = _passwordController.text;

@@ -29,6 +29,7 @@ class _ExpenseFormSheet extends ConsumerStatefulWidget {
 
 class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _categoryFieldKey = GlobalKey<FormFieldState<String>>();
   final _amountFocusNode = FocusNode();
   late final _amountController = TextEditingController(
     text: widget.existing != null ? widget.existing!.amount.toStringAsFixed(0) : '',
@@ -38,6 +39,12 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
   late DateTime _date = widget.existing?.date ?? DateTime.now();
   bool _saving = false;
   bool _deleting = false;
+  // Shown inline rather than via SnackBar — a SnackBar anchors to the
+  // Scaffold *behind* this sheet, and since the sheet already covers the
+  // bottom of the screen (the same place a SnackBar renders), it appeared
+  // invisible behind the sheet. Rendering the error inside the sheet's own
+  // widget tree guarantees it's visible while the sheet is open.
+  String? _formError;
 
   bool get _isEditing => widget.existing != null;
 
@@ -83,7 +90,15 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
 
   Future<void> _pickCategory() async {
     final category = await showCategoryPicker(context, selectedId: _selectedCategory?.id);
-    if (category != null) setState(() => _selectedCategory = category);
+    if (category != null) {
+      setState(() {
+        _selectedCategory = category;
+        _formError = null;
+      });
+      // Re-validates just this field so its error clears the instant a
+      // category is picked, without waiting for the next full-form submit.
+      _categoryFieldKey.currentState?.validate();
+    }
   }
 
   Future<void> _pickDate() async {
@@ -98,11 +113,12 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
   }
 
   Future<void> _submit() async {
+    setState(() => _formError = null);
+    // The category field is a FormField too (see build()), so this single
+    // validate() call covers amount, description, and category together —
+    // all three show their errors in the same pass, in the same inline
+    // style, instead of category needing a separate manual check.
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Choose a category')));
-      return;
-    }
 
     setState(() => _saving = true);
     final amount = double.parse(_amountController.text.trim());
@@ -126,7 +142,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not save expense';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      setState(() => _formError = message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -146,7 +162,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not delete expense';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      setState(() => _formError = message);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
@@ -211,18 +227,38 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickCategory,
-                        icon: _selectedCategory != null
-                            ? CategoryAvatar(icon: _selectedCategory!.icon, colorHex: _selectedCategory!.color, size: 24)
-                            : const Icon(Icons.category_outlined),
-                        label: Text(_selectedCategory?.name ?? 'Category', overflow: TextOverflow.ellipsis),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-                          side: BorderSide(color: colorScheme.outline),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      // A FormField (not just a button) so "Choose a category"
+                      // participates in the same Form.validate() pass as the
+                      // amount/description TextFormFields above and renders
+                      // with the exact same default error-text style, instead
+                      // of a one-off look just for this field.
+                      child: FormField<String>(
+                        key: _categoryFieldKey,
+                        validator: (_) => _selectedCategory == null ? 'Choose a category' : null,
+                        builder: (field) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _pickCategory,
+                              icon: _selectedCategory != null
+                                  ? CategoryAvatar(icon: _selectedCategory!.icon, colorHex: _selectedCategory!.color, size: 24)
+                                  : const Icon(Icons.category_outlined),
+                              label: Text(_selectedCategory?.name ?? 'Category', overflow: TextOverflow.ellipsis),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                                side: BorderSide(color: field.hasError ? colorScheme.error : colorScheme.outline),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                            ),
+                            if (field.hasError)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8, left: 12),
+                                child: Text(field.errorText!, style: textTheme.bodySmall?.copyWith(color: colorScheme.error)),
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -241,6 +277,26 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                     ),
                   ],
                 ),
+                if (_formError != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 18, color: colorScheme.onErrorContainer),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(_formError!, style: textTheme.bodySmall?.copyWith(color: colorScheme.onErrorContainer)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 AppButton(
                   label: _isEditing ? 'Save changes' : 'Add expense',
