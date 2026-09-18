@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_bar_title.dart';
-import '../../../core/widgets/category_avatar.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../categories/domain/category.dart';
 import '../../categories/presentation/category_controller.dart';
+import '../domain/expense_history_filter.dart';
 import 'expense_providers.dart';
 import 'widgets/expense_form_sheet.dart';
+import 'widgets/expense_history_filter_sheet.dart';
 import 'widgets/expense_tile.dart';
 
 class ExpenseHistoryScreen extends ConsumerStatefulWidget {
@@ -46,57 +49,92 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
     }
   }
 
+  String? _categoryName(String? categoryId, List<Category> categories) {
+    if (categoryId == null) return null;
+    for (final category in categories) {
+      if (category.id == categoryId) return category.name;
+    }
+    return null;
+  }
+
+  String _filterSummary(ExpenseHistoryFilter filter, List<Category> categories) {
+    final parts = <String>[];
+    if (filter.period == HistoryPeriodPreset.custom && filter.from != null && filter.to != null) {
+      parts.add('${Formatters.dayMonth(filter.from!)} – ${Formatters.dayMonth(filter.to!.subtract(const Duration(days: 1)))}');
+    } else if (filter.period != HistoryPeriodPreset.all) {
+      parts.add(filter.period.label);
+    }
+    final categoryName = _categoryName(filter.categoryId, categories);
+    if (categoryName != null) parts.add(categoryName);
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final historyAsync = ref.watch(expenseHistoryControllerProvider);
-    final categoriesAsync = ref.watch(categoryControllerProvider);
-    final activeFilter = ref.watch(expenseHistoryFilterProvider);
+    final categories = ref.watch(categoryControllerProvider).value ?? const [];
+    final filter = ref.watch(expenseHistoryFilterProvider);
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const AppBarTitle('All expenses')),
+      appBar: AppBar(
+        title: const AppBarTitle('All expenses'),
+        actions: [
+          IconButton(
+            icon: Badge(isLabelVisible: filter.isActive, smallSize: 8, child: const Icon(Icons.tune)),
+            tooltip: 'Filters',
+            onPressed: () => showExpenseHistoryFilterSheet(context),
+          ),
+        ],
+      ),
       body: Column(
         children: [
-          categoriesAsync.maybeWhen(
-            data: (categories) => SizedBox(
-              height: 44,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: AppSpacing.sm),
-                    child: ChoiceChip(
-                      label: const Text('All'),
-                      selected: activeFilter == null,
-                      onSelected: (_) => ref.read(expenseHistoryFilterProvider.notifier).set(null),
-                    ),
+          if (filter.isActive)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
+              child: InkWell(
+                onTap: () => showExpenseHistoryFilterSheet(context),
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
                   ),
-                  for (final category in categories)
-                    Padding(
-                      padding: const EdgeInsets.only(right: AppSpacing.sm),
-                      child: ChoiceChip(
-                        avatar: CategoryAvatar(icon: category.icon, colorHex: category.color, size: 20),
-                        label: Text(category.name),
-                        selected: activeFilter == category.id,
-                        onSelected: (_) => ref.read(expenseHistoryFilterProvider.notifier).set(category.id),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.filter_alt, size: 16, color: colorScheme.primary),
+                      const SizedBox(width: AppSpacing.xs),
+                      Flexible(
+                        child: Text(
+                          _filterSummary(filter, categories),
+                          style: textTheme.labelLarge?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                ],
+                      const SizedBox(width: AppSpacing.xs),
+                      InkWell(
+                        onTap: () => ref.read(expenseHistoryFilterProvider.notifier).set(const ExpenseHistoryFilter()),
+                        child: Icon(Icons.close, size: 16, color: colorScheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            orElse: () => const SizedBox(height: 44),
-          ),
-          const SizedBox(height: AppSpacing.sm),
           Expanded(
             child: historyAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Could not load expenses: $e')),
               data: (result) {
                 if (result.items.isEmpty) {
-                  return const EmptyState(
+                  return EmptyState(
                     icon: Icons.receipt_long_outlined,
                     title: 'No expenses found',
-                    subtitle: 'Try a different filter.',
+                    subtitle: filter.isActive ? 'Try a different filter.' : null,
                   );
                 }
 
@@ -105,28 +143,59 @@ class _ExpenseHistoryScreenState extends ConsumerState<ExpenseHistoryScreen> {
                   child: ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-                    itemCount: result.items.length + (result.hasMore ? 1 : 0),
+                    // +1 for the loading spinner (while more of this filter's
+                    // pages are still loading) and +1 for the total footer,
+                    // which always renders last regardless of hasMore — the
+                    // total is already known in full from `totalAmount`, it
+                    // doesn't need every page loaded first.
+                    itemCount: result.items.length + (result.hasMore ? 1 : 0) + 1,
                     itemBuilder: (context, index) {
-                      if (index >= result.items.length) {
+                      if (index < result.items.length) {
+                        final expense = result.items[index];
+                        return Dismissible(
+                          key: ValueKey(expense.id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                            child: Icon(Icons.delete_outline, color: colorScheme.error),
+                          ),
+                          onDismissed: (_) => _deleteExpense(expense.id),
+                          child: ExpenseTile(
+                            expense: expense,
+                            onTap: () => showExpenseFormSheet(context, existing: expense),
+                          ),
+                        );
+                      }
+
+                      if (result.hasMore && index == result.items.length) {
                         return const Padding(
                           padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
                           child: Center(child: CircularProgressIndicator()),
                         );
                       }
 
-                      final expense = result.items[index];
-                      return Dismissible(
-                        key: ValueKey(expense.id),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                          child: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
-                        ),
-                        onDismissed: (_) => _deleteExpense(expense.id),
-                        child: ExpenseTile(
-                          expense: expense,
-                          onTap: () => showExpenseFormSheet(context, existing: expense),
+                      // The total footer — a line, then the sum, like the
+                      // bottom of a receipt.
+                      return Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Divider(color: colorScheme.outline),
+                            const SizedBox(height: AppSpacing.sm),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Total', style: textTheme.titleMedium),
+                                Text(
+                                  Formatters.currency(result.totalAmount),
+                                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.xl),
+                          ],
                         ),
                       );
                     },

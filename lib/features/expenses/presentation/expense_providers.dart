@@ -3,6 +3,7 @@ import '../../../core/providers/core_providers.dart';
 import '../../../core/providers/value_notifier_provider.dart';
 import '../../analytics/presentation/analytics_providers.dart';
 import '../data/expense_api.dart';
+import '../domain/expense_history_filter.dart';
 
 final expenseApiProvider = Provider<ExpenseApi>((ref) => ExpenseApi(ref.watch(apiClientProvider)));
 
@@ -37,39 +38,50 @@ class HomeFeedController extends AsyncNotifier<DailySummaryResult> {
 
 final homeFeedControllerProvider = AsyncNotifierProvider<HomeFeedController, DailySummaryResult>(HomeFeedController.new);
 
-/// History screen's active category filter (null = all categories). Lives
-/// in its own provider rather than as field state on
+/// History screen's active filter (category + time period, composed
+/// together). Lives in its own provider rather than as field state on
 /// ExpenseHistoryController — that controller gets invalidated after every
 /// create/update/delete (see ExpenseMutationController below), which
 /// recreates the instance and would otherwise silently drop the filter.
-final expenseHistoryFilterProvider = simpleValueProvider<String?>(null);
+final expenseHistoryFilterProvider = simpleValueProvider<ExpenseHistoryFilter>(const ExpenseHistoryFilter());
 
-/// Full expense history: paginated, optionally filtered by category. Used
-/// by the "View all" drill-down from Home and wherever edit/delete needs
-/// the complete list, not just the last two weeks.
+/// Full expense history: paginated, optionally filtered by category and/or
+/// time period. Used by the "View all" drill-down from Home and wherever
+/// edit/delete needs the complete list, not just the last two weeks. When a
+/// period filter is active, pagination is naturally bounded to it — `from`/
+/// `to` scope every query (count, sum, and the page itself), so "load more"
+/// simply runs out once that period's data is exhausted.
 class ExpenseHistoryController extends AsyncNotifier<ExpenseListResult> {
   @override
   Future<ExpenseListResult> build() {
-    final categoryId = ref.watch(expenseHistoryFilterProvider);
-    return ref.read(expenseApiProvider).list(categoryId: categoryId, page: 1);
+    final filter = ref.watch(expenseHistoryFilterProvider);
+    return ref.read(expenseApiProvider).list(categoryId: filter.categoryId, from: filter.from, to: filter.to, page: 1);
   }
 
   Future<void> refresh() async {
-    final categoryId = ref.read(expenseHistoryFilterProvider);
-    state = await AsyncValue.guard(() => ref.read(expenseApiProvider).list(categoryId: categoryId, page: 1));
+    final filter = ref.read(expenseHistoryFilterProvider);
+    state = await AsyncValue.guard(
+      () => ref.read(expenseApiProvider).list(categoryId: filter.categoryId, from: filter.from, to: filter.to, page: 1),
+    );
   }
 
   Future<void> loadMore() async {
     final current = state.value;
     if (current == null || !current.hasMore) return;
 
-    final categoryId = ref.read(expenseHistoryFilterProvider);
-    final next = await ref.read(expenseApiProvider).list(categoryId: categoryId, page: current.page + 1);
+    final filter = ref.read(expenseHistoryFilterProvider);
+    final next = await ref.read(expenseApiProvider).list(
+          categoryId: filter.categoryId,
+          from: filter.from,
+          to: filter.to,
+          page: current.page + 1,
+        );
     state = AsyncData(ExpenseListResult(
       items: [...current.items, ...next.items],
       page: next.page,
       limit: next.limit,
       total: next.total,
+      totalAmount: next.totalAmount,
     ));
   }
 }

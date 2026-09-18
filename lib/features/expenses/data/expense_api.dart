@@ -7,8 +7,18 @@ class ExpenseListResult {
   final int page;
   final int limit;
   final int total;
+  // Sum of `amount` across every matching document for the current filter,
+  // not just the items loaded so far — lets the History screen show an
+  // accurate running total without needing every page fetched first.
+  final double totalAmount;
 
-  ExpenseListResult({required this.items, required this.page, required this.limit, required this.total});
+  ExpenseListResult({
+    required this.items,
+    required this.page,
+    required this.limit,
+    required this.total,
+    required this.totalAmount,
+  });
 
   bool get hasMore => items.length + (page - 1) * limit < total;
 }
@@ -50,6 +60,7 @@ class ExpenseApi {
         page: res.data['page'] as int,
         limit: res.data['limit'] as int,
         total: res.data['total'] as int,
+        totalAmount: (res.data['totalAmount'] as num).toDouble(),
       );
     } catch (e) {
       throw ApiClient.toApiException(e);
