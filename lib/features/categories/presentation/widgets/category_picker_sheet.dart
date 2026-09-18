@@ -25,7 +25,11 @@ class _CategoryPickerSheet extends ConsumerWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
+        // See ExpenseFormSheet's build() for why this needs an explicit
+        // scroll fallback. The grid below already caps its own height at
+        // 50% of the screen, but a shorter (landscape) viewport could still
+        // leave less than that available once the title/padding are added.
+        child: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -85,7 +89,7 @@ class _CategoryPickerSheet extends ConsumerWidget {
               ),
             ),
           ],
-        ),
+        )),
       ),
     );
   }

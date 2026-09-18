@@ -180,7 +180,15 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Form(
             key: _formKey,
-            child: Column(
+            // Sheets from showGlassBottomSheet (isScrollControlled: true)
+            // don't auto-scroll their content — with the delete button, both
+            // text fields, category/date row, and an error banner all
+            // stacked up, a shorter viewport (landscape) or a larger text-
+            // size setting could ask for more height than's available. This
+            // wrap is a no-op in the common case (content already fits, so
+            // nothing visibly scrolls) and just prevents an overflow crash
+            // in the tighter ones.
+            child: SingleChildScrollView(child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -304,7 +312,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                   loading: _saving,
                 ),
               ],
-            ),
+            )),
           ),
         ),
       ),

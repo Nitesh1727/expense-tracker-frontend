@@ -76,9 +76,18 @@ class _ProfilePromptScreenState extends ConsumerState<ProfilePromptScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          child: Column(
+        // See WelcomeScreen's build() for why a centered Column alone isn't
+        // safe here — the name field autofocuses (keyboard opens
+        // immediately), which combined with a landscape rotation or a
+        // larger text-size setting is exactly the kind of short-viewport
+        // case this guards against. Keeps the same centered look when
+        // everything fits and only scrolls once it doesn't.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -111,6 +120,8 @@ class _ProfilePromptScreenState extends ConsumerState<ProfilePromptScreen> {
                 ),
               ),
             ],
+          ),
+            ),
           ),
         ),
       ),

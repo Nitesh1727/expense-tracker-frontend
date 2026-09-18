@@ -18,9 +18,19 @@ class WelcomeScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          child: Column(
+        // A plain centered Column here overflows if the content is ever
+        // taller than the viewport (landscape rotation, a larger text-size
+        // setting, a short device) since nothing about it can shrink or
+        // scroll. LayoutBuilder + a minHeight-constrained scroll view keeps
+        // the exact same centered look when everything fits (the Column is
+        // *at least* as tall as the screen, so centering still applies) and
+        // only starts scrolling once it doesn't.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -75,6 +85,8 @@ class WelcomeScreen extends StatelessWidget {
                 ),
               ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.1, end: 0),
             ],
+              ),
+            ),
           ),
         ),
       ),

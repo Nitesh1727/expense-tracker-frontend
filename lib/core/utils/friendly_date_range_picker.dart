@@ -61,7 +61,15 @@ class _DateRangeStepDialogState extends State<_DateRangeStepDialog> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Dialog(
-      child: SizedBox(
+      // Header text (3 lines) + a fixed-height calendar + footer buttons
+      // easily exceeds a short landscape viewport, and Dialog doesn't scroll
+      // its content on its own. Capping the dialog's height and wrapping in
+      // a scroll view is a no-op in the common (portrait, enough room) case
+      // and just prevents an overflow crash in the tighter ones.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+        child: SingleChildScrollView(
+          child: SizedBox(
         width: 320,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -130,6 +138,8 @@ class _DateRangeStepDialogState extends State<_DateRangeStepDialog> {
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

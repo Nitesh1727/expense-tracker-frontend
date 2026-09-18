@@ -66,9 +66,16 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-          child: Form(
+        // See WelcomeScreen's build() for why a centered Column alone isn't
+        // safe here (landscape rotation, a larger text-size setting, a short
+        // device) — this keeps the same centered look when everything fits
+        // and only scrolls once it doesn't.
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,6 +113,8 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                     .animate()
                     .fadeIn(delay: 250.ms),
               ],
+            ),
+              ),
             ),
           ),
         ),

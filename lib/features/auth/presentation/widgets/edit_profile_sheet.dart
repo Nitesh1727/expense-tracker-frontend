@@ -70,7 +70,11 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Form(
             key: _formKey,
-            child: Column(
+            // See ExpenseFormSheet's build() for why this needs an explicit
+            // scroll fallback — isScrollControlled sheets don't get one for
+            // free, and a shorter (landscape) viewport with the keyboard
+            // open could ask for more height than's available.
+            child: SingleChildScrollView(child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -97,7 +101,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 const SizedBox(height: AppSpacing.lg),
                 AppButton(label: 'Save', onPressed: _save, loading: _saving),
               ],
-            ),
+            )),
           ),
         ),
       ),
