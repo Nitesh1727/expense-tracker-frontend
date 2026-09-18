@@ -50,7 +50,14 @@ class SwipeableAmountTile<T> extends StatefulWidget {
 
 class _SwipeableAmountTileState<T> extends State<SwipeableAmountTile<T>> {
   static const _viewportFraction = 0.82;
-  static const _tileHeight = 190.0;
+  // Base height at the Normal text-size setting — scaled by the current
+  // text-scale factor at build time (see build() below), not used as-is.
+  // A fixed pixel height overflowed at the Large setting: FittedBox already
+  // shrinks the amount text to fit *width* (handles arbitrarily large
+  // numbers, even billions), but nothing was growing the card's *height* to
+  // match a bigger text-size setting, so the label + amount content simply
+  // didn't fit inside a height that was sized for the Normal setting.
+  static const _baseTileHeight = 190.0;
 
   late final PageController _controller;
   late int _page;
@@ -112,8 +119,14 @@ class _SwipeableAmountTileState<T> extends State<SwipeableAmountTile<T>> {
 
   @override
   Widget build(BuildContext context) {
+    // Scales the card's height by the same factor the text-size setting
+    // applies to its text (0.9/1.0/1.15 — see app.dart's MediaQuery
+    // override), so the label + amount always has enough room instead of
+    // the card staying a fixed pixel height while its content grows taller.
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+
     return SizedBox(
-      height: _tileHeight,
+      height: _baseTileHeight * textScale,
       child: PageView.builder(
         controller: _controller,
         scrollDirection: Axis.vertical,
