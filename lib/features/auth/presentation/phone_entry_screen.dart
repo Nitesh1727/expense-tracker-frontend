@@ -100,6 +100,9 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   autofillHints: const [AutofillHints.telephoneNumber],
+                  // Matches the backend's own format (auth.validator.js): a
+                  // '+' plus up to 15 digits.
+                  maxLength: 16,
                   decoration: const InputDecoration(
                     labelText: 'Phone number',
                     hintText: '+919876543210',

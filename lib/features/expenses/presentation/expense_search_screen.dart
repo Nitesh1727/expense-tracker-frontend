@@ -321,9 +321,14 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
                     controller: _queryController,
                     focusNode: _queryFocusNode,
                     onChanged: _onQueryChanged,
+                    // Matches the backend's own cap on `q` (expense.validator.js)
+                    // — counterText suppressed since a visible "0/120" reads
+                    // oddly on a search box, not a form field.
+                    maxLength: 120,
                     decoration: const InputDecoration(
                       hintText: 'Description / amount',
                       prefixIcon: Icon(Icons.search),
+                      counterText: '',
                       isDense: true,
                     ),
                   ),

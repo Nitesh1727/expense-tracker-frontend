@@ -241,7 +241,7 @@ class _CategoryBreakdownRow extends StatelessWidget {
         children: [
           CategoryAvatar(icon: entry.category.icon, colorHex: entry.category.color, size: 32),
           const SizedBox(width: AppSpacing.md),
-          Expanded(child: Text(entry.category.name, style: textTheme.bodyLarge)),
+          Expanded(child: Text(entry.category.name, style: textTheme.bodyLarge, overflow: TextOverflow.ellipsis)),
           Text(
             '${percent.toStringAsFixed(0)}%',
             style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),

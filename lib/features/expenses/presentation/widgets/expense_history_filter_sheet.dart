@@ -139,59 +139,75 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
               categoriesAsync.when(
                 loading: () => const SizedBox(height: 36, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
                 error: (e, _) => Text('Could not load categories', style: textTheme.bodySmall),
-                data: (categories) => Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: [
-                    // "All" clears the whole set rather than being one more
-                    // toggle among many — selecting any specific category
-                    // while "All" is also selected wouldn't mean anything.
-                    // Only highlighted once explicitly tapped (`_categoryIds`
-                    // non-null and empty) — not just because nothing else
-                    // happens to be selected yet.
-                    ChoiceChip(
-                      label: const Text('All'),
-                      selected: _categoryIds != null && _categoryIds!.isEmpty,
-                      onSelected: (_) => setState(() => _categoryIds = {}),
+                // No "All" chip — deselecting every category chip (or never
+                // touching any of them) already means "no category filter",
+                // which used to visually snap to a dedicated "All" chip
+                // looking selected, reading as an unwanted fallback rather
+                // than "nothing is chosen". Bounded + independently
+                // scrollable since a user can add as many categories as they
+                // want (no cap on the Categories tab) — without this, a long
+                // list would push the time-period section and Apply/Clear
+                // buttons far down the sheet instead of staying put.
+                data: (categories) => ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 160),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        for (final category in categories)
+                          ConstrainedBox(
+                            // Category names are already capped at 30 chars
+                            // server-side, but this guards the layout too in
+                            // case that ever changes or data arrives from
+                            // elsewhere — ellipsizes instead of stretching
+                            // the chip arbitrarily wide.
+                            constraints: const BoxConstraints(maxWidth: 200),
+                            child: FilterChip(
+                              avatar: CategoryAvatar(icon: category.icon, colorHex: category.color, size: 20),
+                              label: Text(category.name, overflow: TextOverflow.ellipsis),
+                              selected: _categoryIds?.contains(category.id) ?? false,
+                              onSelected: (selected) => setState(() {
+                                _categoryIds ??= {};
+                                if (selected) {
+                                  _categoryIds!.add(category.id);
+                                } else {
+                                  _categoryIds!.remove(category.id);
+                                }
+                              }),
+                            ),
+                          ),
+                      ],
                     ),
-                    for (final category in categories)
-                      FilterChip(
-                        avatar: CategoryAvatar(icon: category.icon, colorHex: category.color, size: 20),
-                        label: Text(category.name),
-                        selected: _categoryIds?.contains(category.id) ?? false,
-                        onSelected: (selected) => setState(() {
-                          _categoryIds ??= {};
-                          if (selected) {
-                            _categoryIds!.add(category.id);
-                          } else {
-                            _categoryIds!.remove(category.id);
-                          }
-                        }),
-                      ),
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
               Text('Time period', style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant)),
               const SizedBox(height: AppSpacing.sm),
-              // No chip highlighted (including "All time") until one is
-              // explicitly tapped — `_period == null` means untouched.
+              // No chip highlighted until one is explicitly tapped —
+              // `_period == null` means untouched/no filter. No "All time"
+              // chip (same reasoning as categories above) — tapping an
+              // already-selected chip again clears it back to null instead,
+              // so there's always a way back to "no period filter" without
+              // a dedicated chip for it.
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
                 children: [
                   for (final preset in HistoryPeriodPreset.values)
-                    ChoiceChip(
-                      label: Text(preset.label),
-                      selected: _period == preset,
-                      onSelected: (_) {
-                        if (preset == HistoryPeriodPreset.custom) {
-                          _pickCustomRange();
-                        } else {
-                          setState(() => _period = preset);
-                        }
-                      },
-                    ),
+                    if (preset != HistoryPeriodPreset.all)
+                      ChoiceChip(
+                        label: Text(preset.label),
+                        selected: _period == preset,
+                        onSelected: (_) {
+                          if (preset == HistoryPeriodPreset.custom) {
+                            _pickCustomRange();
+                          } else {
+                            setState(() => _period = _period == preset ? null : preset);
+                          }
+                        },
+                      ),
                 ],
               ),
               if (_period == HistoryPeriodPreset.custom && _customFrom != null && _customTo != null) ...[

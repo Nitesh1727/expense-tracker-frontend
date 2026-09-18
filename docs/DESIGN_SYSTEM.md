@@ -252,18 +252,29 @@ something reached constantly like the 3 tabs are.
   make that Back button possible.
 - **Search's Filters sheet category picker is multi-select** (`FilterChip`,
   not `ChoiceChip`) — pick any number of categories, not just one or all.
-  "All" is its own chip that clears the whole selection rather than being
-  one more toggle among many. The backend's `GET /expenses` and
+  No "All" chip — it used to be its own chip that cleared the whole
+  selection, but deselecting every category chip already means "no category
+  filter" on its own, and having a dedicated "All" chip meant it visually
+  snapped to "selected" the moment the last real category was deselected,
+  reading as an unwanted fallback rather than "nothing chosen" (explicit
+  user feedback). Bounded to a max height (`ConstrainedBox` +
+  `SingleChildScrollView`, independent of the sheet's own outer scroll) so a
+  user with many categories (no cap on the Categories tab) gets a scrollable
+  chip grid instead of the time-period section and Apply/Clear buttons being
+  pushed far down the sheet. The backend's `GET /expenses` and
   `GET /expenses/daily-summary` both gained a `categoryIds` query param
   (comma-separated, matched with `$in`) alongside the existing singular
   `categoryId`, which other call sites (e.g. DayTile's per-day fetch) still
   use unchanged.
 - **`HistoryPeriodPreset`** (the quick period chips in Search's Filters
   sheet — see `expense_history_filter.dart`) includes **Last month**
-  alongside All time/Today/This week/This month/Custom, added per explicit
-  request as "the most commonly used" period beyond the current one. Adding
-  a case to that one enum is enough for it to appear wherever the preset
-  chips are used, by construction.
+  alongside Today/This week/This month/Custom, added per explicit request as
+  "the most commonly used" period beyond the current one. `all` is still a
+  value on the enum (the domain-level "no period filter" sentinel — from/to
+  end up null) but has no chip of its own, same reasoning as categories'
+  removed "All" chip above; tapping an already-selected period chip again
+  clears it back to that state instead. Adding a case to the enum is enough
+  for a new preset to appear wherever the chips are used, by construction.
 - **Search screen** (`ExpenseSearchScreen`) is Home's sole entry point for
   browsing/filtering/searching expenses — it used to be two separate
   screens (a Search screen with only a date filter, and a History screen
@@ -286,12 +297,15 @@ something reached constantly like the 3 tabs are.
   pre-highlighted — per explicit user feedback that pre-checking those
   looked like a choice had already been made, and pressing Apply against
   those defaults appeared to do nothing (`filter.isActive` alone can't
-  distinguish "untouched" from "explicitly chose All/All time", so a
-  sibling provider, `expenseFiltersEverAppliedProvider`, tracks whether
+  distinguish "untouched" from "explicitly chose All categories/All time",
+  so a sibling provider, `expenseFiltersEverAppliedProvider`, tracks whether
   Apply has actually been pressed at least once). The sheet's own draft
   state (`_categoryIds`/`_period` in `expense_history_filter_sheet.dart`)
-  is nullable for the same reason — `null` renders with no chip
-  highlighted; pressing Apply with nothing touched defaults both to "All".
+  is nullable for the same reason — `null` renders with no chip highlighted;
+  pressing Apply with nothing touched defaults both to "match everything".
+  There's no "All"/"All time" chip to tap back to that state explicitly —
+  deselecting every category chip, or tapping an already-selected period
+  chip again, gets there directly (see the two bullets above).
 - **Pagination loading state is a field on the result, not derived from
   `hasMore`** (`DailySummaryResult.isLoadingMore` / `ExpenseListResult.
   isLoadingMore`, used by Home's day-tile feed and both of Search's

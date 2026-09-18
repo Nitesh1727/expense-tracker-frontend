@@ -85,11 +85,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user?.name ?? 'Add your name', style: textTheme.titleLarge),
+                    Text(user?.name ?? 'Add your name', style: textTheme.titleLarge, overflow: TextOverflow.ellipsis),
                     if (user?.phone != null)
-                      Text(user!.phone!, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                      Text(user!.phone!, overflow: TextOverflow.ellipsis, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
                     if (user?.email != null)
-                      Text(user!.email!, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
+                      Text(user!.email!, overflow: TextOverflow.ellipsis, style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),

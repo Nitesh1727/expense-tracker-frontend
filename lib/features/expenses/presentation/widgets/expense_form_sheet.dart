@@ -230,6 +230,10 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                 TextFormField(
                   controller: _descriptionController,
                   textCapitalization: TextCapitalization.sentences,
+                  // Matches the backend's own cap (expense.validator.js) —
+                  // enforced here too so a long description is caught while
+                  // typing instead of only failing on submit.
+                  maxLength: 30,
                   decoration: const InputDecoration(labelText: 'Description', hintText: 'e.g. Pizza, Uber ride'),
                   validator: (value) => (value?.trim().isEmpty ?? true) ? 'Add a short description' : null,
                 ),

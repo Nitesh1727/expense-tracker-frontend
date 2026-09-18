@@ -28,6 +28,11 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   late final _nameController = TextEditingController(text: widget.user.name ?? '');
   late final _emailController = TextEditingController(text: widget.user.email ?? '');
   bool _saving = false;
+  // Shown inline rather than via SnackBar — a SnackBar anchors to the
+  // Scaffold *behind* this sheet, so it rendered invisible behind the
+  // sheet's own surface while it was open (same issue as ExpenseFormSheet's
+  // _formError; fixed there first).
+  String? _formError;
 
   @override
   void dispose() {
@@ -37,6 +42,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   }
 
   Future<void> _save() async {
+    setState(() => _formError = null);
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _saving = true);
@@ -53,7 +59,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not save profile';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      setState(() => _formError = message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -62,6 +68,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -84,6 +91,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
                   autofocus: true,
+                  // Matches the backend's own cap (auth.validator.js).
+                  maxLength: 50,
                   decoration: const InputDecoration(labelText: 'Name', hintText: 'e.g. Nitesh Yadav'),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -98,6 +107,23 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                     return null;
                   },
                 ),
+                if (_formError != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                    decoration: BoxDecoration(color: colorScheme.errorContainer, borderRadius: BorderRadius.circular(12)),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 18, color: colorScheme.onErrorContainer),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(_formError!, style: textTheme.bodySmall?.copyWith(color: colorScheme.onErrorContainer)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 AppButton(label: 'Save', onPressed: _save, loading: _saving),
               ],

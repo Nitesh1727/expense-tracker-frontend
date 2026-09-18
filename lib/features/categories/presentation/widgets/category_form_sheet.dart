@@ -33,6 +33,11 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
   late String _icon = widget.existing?.icon ?? CategoryPresets.icons.keys.first;
   late String _color = widget.existing?.color ?? CategoryPresets.colorHexes.first;
   bool _saving = false;
+  // Shown inline rather than via SnackBar — a SnackBar anchors to the
+  // Scaffold *behind* this sheet, so it rendered invisible behind the
+  // sheet's own surface while it was open (same issue as ExpenseFormSheet's
+  // _formError; fixed there first).
+  String? _formError;
 
   bool get _isEditing => widget.existing != null;
 
@@ -43,6 +48,7 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
   }
 
   Future<void> _submit() async {
+    setState(() => _formError = null);
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() => _saving = true);
@@ -60,7 +66,7 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not save category';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      setState(() => _formError = message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -88,6 +94,10 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
                   controller: _nameController,
                   autofocus: !_isEditing,
                   textCapitalization: TextCapitalization.words,
+                  // Matches the backend's own cap (category.model.js) —
+                  // enforced here too so a long name is caught while typing
+                  // instead of only failing on submit.
+                  maxLength: 30,
                   decoration: const InputDecoration(labelText: 'Name', hintText: 'e.g. Subscriptions'),
                   validator: (value) => (value?.trim().isEmpty ?? true) ? 'Name is required' : null,
                 ),
@@ -123,6 +133,23 @@ class _CategoryFormSheetState extends ConsumerState<_CategoryFormSheet> {
                       ),
                   ],
                 ),
+                if (_formError != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                    decoration: BoxDecoration(color: colorScheme.errorContainer, borderRadius: BorderRadius.circular(12)),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, size: 18, color: colorScheme.onErrorContainer),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(_formError!, style: textTheme.bodySmall?.copyWith(color: colorScheme.onErrorContainer)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.xl),
                 AppButton(label: _isEditing ? 'Save changes' : 'Create category', onPressed: _submit, loading: _saving),
               ],

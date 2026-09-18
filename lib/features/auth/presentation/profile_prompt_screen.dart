@@ -102,6 +102,8 @@ class _ProfilePromptScreenState extends ConsumerState<ProfilePromptScreen> {
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
                 autofocus: true,
+                // Matches the backend's own cap (auth.validator.js).
+                maxLength: 50,
                 decoration: const InputDecoration(labelText: 'Name', hintText: 'e.g. Nitesh Yadav'),
               ).animate().fadeIn(delay: 150.ms),
               const SizedBox(height: AppSpacing.md),

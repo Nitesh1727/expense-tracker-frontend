@@ -65,7 +65,7 @@ class CategoriesScreen extends ConsumerWidget {
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CategoryAvatar(icon: category.icon, colorHex: category.color),
-                title: Text(category.name, style: textTheme.bodyLarge),
+                title: Text(category.name, style: textTheme.bodyLarge, overflow: TextOverflow.ellipsis),
                 subtitle: category.isDeletable ? null : Text('Default fallback category', style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant)),
                 trailing: category.isDeletable
                     ? IconButton(

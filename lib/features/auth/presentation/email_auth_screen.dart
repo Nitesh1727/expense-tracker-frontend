@@ -97,6 +97,8 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                   TextFormField(
                     controller: _nameController,
                     textCapitalization: TextCapitalization.words,
+                    // Matches the backend's own cap (auth.validator.js).
+                    maxLength: 50,
                     decoration: const InputDecoration(labelText: 'Name (optional)', hintText: 'e.g. Nitesh Yadav'),
                   ),
                   const SizedBox(height: AppSpacing.md),

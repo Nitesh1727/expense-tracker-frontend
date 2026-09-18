@@ -40,6 +40,7 @@ class ExpenseTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     secondaryLine,
+                    overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                 ],
