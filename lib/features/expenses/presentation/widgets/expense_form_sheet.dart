@@ -37,6 +37,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
   Category? _selectedCategory;
   late DateTime _date = widget.existing?.date ?? DateTime.now();
   bool _saving = false;
+  bool _deleting = false;
 
   bool get _isEditing => widget.existing != null;
 
@@ -130,6 +131,26 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
     }
   }
 
+  /// No confirmation dialog — matches the existing swipe-to-delete on the
+  /// full history list (expense_history_screen.dart), which also deletes
+  /// immediately. `ExpenseMutationController.delete` already refreshes every
+  /// dependent (Home feed, analytics, history), so closing this sheet leaves
+  /// every screen already showing the deletion, not just this one.
+  Future<void> _delete() async {
+    setState(() => _deleting = true);
+    try {
+      await ref.read(expenseMutationControllerProvider.notifier).delete(widget.existing!.id);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : 'Could not delete expense';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -146,7 +167,24 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_isEditing ? 'Edit expense' : 'Add expense', style: textTheme.titleLarge),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(_isEditing ? 'Edit expense' : 'Add expense', style: textTheme.titleLarge),
+                    if (_isEditing)
+                      IconButton(
+                        icon: _deleting
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.error),
+                              )
+                            : Icon(Icons.delete_outline, color: colorScheme.error),
+                        tooltip: 'Delete expense',
+                        onPressed: (_saving || _deleting) ? null : _delete,
+                      ),
+                  ],
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 TextFormField(
                   controller: _amountController,
@@ -203,7 +241,11 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                AppButton(label: _isEditing ? 'Save changes' : 'Add expense', onPressed: _submit, loading: _saving),
+                AppButton(
+                  label: _isEditing ? 'Save changes' : 'Add expense',
+                  onPressed: _deleting ? null : _submit,
+                  loading: _saving,
+                ),
               ],
             ),
           ),

@@ -8,6 +8,7 @@ import '../../../core/widgets/swipeable_amount_tile.dart';
 import '../../analytics/presentation/analytics_providers.dart';
 import 'expense_history_screen.dart';
 import 'expense_providers.dart';
+import 'expense_search_screen.dart';
 import 'widgets/day_tile.dart';
 
 const _homePeriodLabels = {'day': 'Today', 'week': 'This week', 'month': 'This month'};
@@ -76,12 +77,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Recent', style: textTheme.titleLarge),
-              IconButton(
-                icon: const Icon(Icons.tune),
-                tooltip: 'Filter',
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ExpenseHistoryScreen()),
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    tooltip: 'Search',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ExpenseSearchScreen()),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.tune),
+                    tooltip: 'Filter',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ExpenseHistoryScreen()),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

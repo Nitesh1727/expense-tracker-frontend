@@ -40,26 +40,50 @@ class _DayTileState extends ConsumerState<DayTile> {
   Future<void> _toggle() async {
     setState(() => _expanded = !_expanded);
     if (_expanded && _items == null && !_loading) {
+      await _fetchItems();
+    }
+  }
+
+  Future<void> _fetchItems() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final from = widget.summary.date;
+      final to = from.add(const Duration(days: 1));
+      final result = await ref.read(expenseApiProvider).list(from: from, to: to, limit: 100);
+      if (!mounted) return;
       setState(() {
-        _loading = true;
-        _error = null;
+        _items = result.items;
+        _loading = false;
       });
-      try {
-        final from = widget.summary.date;
-        final to = from.add(const Duration(days: 1));
-        final result = await ref.read(expenseApiProvider).list(from: from, to: to, limit: 100);
-        if (!mounted) return;
-        setState(() {
-          _items = result.items;
-          _loading = false;
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() {
-          _error = 'Could not load — pull to refresh and try again';
-          _loading = false;
-        });
-      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not load — pull to refresh and try again';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant DayTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // This widget is keyed by date (see home_screen.dart), so the same
+    // State instance survives across a HomeFeedController refresh — the
+    // day's count/total in `widget.summary` update correctly on every
+    // rebuild, but the *expanded item list* was fetched once and cached
+    // forever, so adding/editing/deleting an expense on an already-expanded
+    // day updated the outer total but silently left the stale item list
+    // showing underneath it. A changed count or total means this day's
+    // expenses changed elsewhere, so the cache is stale — clear it, and if
+    // currently expanded, refetch immediately rather than waiting for the
+    // user to collapse/reopen the tile.
+    final changed = oldWidget.summary.count != widget.summary.count || oldWidget.summary.total != widget.summary.total;
+    if (changed) {
+      _items = null;
+      if (_expanded) _fetchItems();
     }
   }
 
