@@ -4,35 +4,45 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/utils/friendly_date_range_picker.dart';
 import '../../../core/widgets/app_bar_title.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../categories/domain/category.dart';
+import '../../categories/presentation/category_controller.dart';
 import '../data/expense_api.dart';
+import '../domain/expense.dart';
 import '../domain/expense_history_filter.dart';
 import 'expense_providers.dart';
 import 'widgets/day_tile.dart';
 import 'widgets/expense_form_sheet.dart';
+import 'widgets/expense_history_filter_sheet.dart';
 import 'widgets/expense_tile.dart';
 
-/// Search by description/amount, and/or a date filter — a different entry
-/// point from the History screen's category+period Filters sheet
-/// (deliberately separate, per explicit request), though it reuses the same
-/// [HistoryPeriodPreset] date-range logic for consistency.
+/// Search by description/amount, and/or a category/period Filters sheet —
+/// this used to be two separate entry points from Home (Search and Filter)
+/// doing almost the same thing; merged into one per explicit user feedback.
+/// The Filters sheet (category multi-select + time period, including
+/// custom range) is the exact same [showExpenseHistoryFilterSheet] widget,
+/// reused as-is rather than duplicated — its state lives in
+/// [expenseHistoryFilterProvider] so it round-trips correctly regardless of
+/// which screen opens the sheet.
 ///
-/// Two distinct results views, chosen by whether there's a text query:
-/// - **Date only** (no text typed): the same grouped day-tiles Home uses
-///   (literally reuses [DayTile]), scoped to the picked range — "show me
-///   what I spent these dates" reads naturally as the familiar day-grouped
-///   view, not a flat list.
-/// - **Text query present** (with or without a date filter): a flat list of
-///   matching expenses directly — "all Pizza expenses" or "everything ₹500"
-///   doesn't group by day the way browsing history does, the point is to
-///   read the matches directly.
+/// Two distinct results views — see [_wantsFlatList]:
+/// - **Time period only, or no filter at all**: the same grouped day-tiles
+///   Home uses (literally reuses [DayTile], passing the active category
+///   filter — empty in this branch — through to its own per-day fetch too)
+///   — "show me what I spent these dates" reads naturally as the familiar
+///   day-grouped view, not a flat list.
+/// - **A category filter and/or a text query is active**: a flat list of
+///   matching expenses directly instead — "all Food expenses" or "all Pizza
+///   this month" is about reading the specific matches, not browsing by day.
+///   Per explicit user feedback: day-tiles should only appear for a pure
+///   time-period browse, not once something more specific is being asked for.
 ///
-/// Deliberately not paginated with "load more" like the History screen —
-/// search results are typically a narrow slice already; this fetches one
-/// generous page (the max the backend allows) rather than adding a second
-/// parallel infinite-scroll mode on top of an already-dual-mode screen.
+/// Deliberately not paginated with "load more" like a full history list
+/// would be — search results are typically a narrower slice already; this
+/// fetches one generous page (the max the backend allows) rather than
+/// adding a second parallel infinite-scroll mode on top of an already
+/// dual-mode screen.
 class ExpenseSearchScreen extends ConsumerStatefulWidget {
   const ExpenseSearchScreen({super.key});
 
@@ -46,18 +56,20 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
   Timer? _debounce;
 
   String _query = '';
-  HistoryPeriodPreset _period = HistoryPeriodPreset.all;
-  DateTime? _from;
-  DateTime? _to;
-
   bool _loading = false;
   String? _error;
   DailySummaryResult? _dailyResult;
   ExpenseListResult? _listResult;
 
   bool get _hasQuery => _query.trim().isNotEmpty;
-  bool get _hasDateFilter => _period != HistoryPeriodPreset.all;
-  bool get _hasAnyFilter => _hasQuery || _hasDateFilter;
+
+  /// Grouped day-tiles only make sense for "browse by date" — the moment a
+  /// category filter (or a text query) narrows things down to something
+  /// specific, a flat list of the actual matches is more useful than a
+  /// day-by-day total. So: day-tiles when only a time period (or nothing)
+  /// is filtering; a flat list the moment a category and/or text query is
+  /// also in play. Per explicit user feedback.
+  bool _wantsFlatList(ExpenseHistoryFilter filter) => _hasQuery || filter.categoryIds.isNotEmpty;
 
   @override
   void initState() {
@@ -99,7 +111,8 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
   }
 
   Future<void> _runSearch() async {
-    if (!_hasAnyFilter) {
+    final filter = ref.read(expenseHistoryFilterProvider);
+    if (!_hasQuery && !filter.isActive) {
       setState(() {
         _dailyResult = null;
         _listResult = null;
@@ -114,11 +127,12 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     });
 
     try {
-      if (_hasQuery) {
+      if (_wantsFlatList(filter)) {
         final result = await ref.read(expenseApiProvider).list(
-              q: _query.trim(),
-              from: _from,
-              to: _to,
+              q: _hasQuery ? _query.trim() : null,
+              categoryIds: filter.categoryIds.toList(),
+              from: filter.from,
+              to: filter.to,
               limit: 100,
             );
         if (!mounted) return;
@@ -128,7 +142,12 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
           _loading = false;
         });
       } else {
-        final result = await ref.read(expenseApiProvider).dailySummary(from: _from, to: _to, limit: 60);
+        final result = await ref.read(expenseApiProvider).dailySummary(
+              categoryIds: filter.categoryIds.toList(),
+              from: filter.from,
+              to: filter.to,
+              limit: 60,
+            );
         if (!mounted) return;
         setState(() {
           _dailyResult = result;
@@ -146,27 +165,15 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     }
   }
 
-  Future<void> _pickPeriod() async {
-    final picked = await showModalBottomSheet<(HistoryPeriodPreset, DateTime?, DateTime?)>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _PeriodPickerSheet(current: _period, currentFrom: _from, currentTo: _to),
-    );
-    if (picked == null) return;
-    setState(() {
-      _period = picked.$1;
-      _from = picked.$2;
-      _to = picked.$3;
-    });
+  Future<void> _openFilters() async {
+    await showExpenseHistoryFilterSheet(context);
+    // Whether Apply, Clear, or a back-gesture closed it — re-running is a
+    // harmless no-op if nothing actually changed.
     _runSearch();
   }
 
-  void _clearDateFilter() {
-    setState(() {
-      _period = HistoryPeriodPreset.all;
-      _from = null;
-      _to = null;
-    });
+  Future<void> _editExpense(Expense expense) async {
+    await showExpenseFormSheet(context, existing: expense);
     _runSearch();
   }
 
@@ -181,17 +188,32 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     }
   }
 
-  String _dateFilterLabel() {
-    if (_period == HistoryPeriodPreset.custom && _from != null && _to != null) {
-      return '${Formatters.dayMonth(_from!)} – ${Formatters.dayMonth(_to!.subtract(const Duration(days: 1)))}';
+  String? _categoryNamesLabel(Set<String> categoryIds, List<Category> categories) {
+    if (categoryIds.isEmpty) return null;
+    final names = categories.where((c) => categoryIds.contains(c.id)).map((c) => c.name).toList();
+    if (names.isEmpty) return null;
+    if (names.length <= 2) return names.join(', ');
+    return '${names.length} categories';
+  }
+
+  String _filterSummary(ExpenseHistoryFilter filter, List<Category> categories) {
+    final parts = <String>[];
+    if (filter.period == HistoryPeriodPreset.custom && filter.from != null && filter.to != null) {
+      parts.add('${Formatters.dayMonth(filter.from!)} – ${Formatters.dayMonth(filter.to!.subtract(const Duration(days: 1)))}');
+    } else if (filter.period != HistoryPeriodPreset.all) {
+      parts.add(filter.period.label);
     }
-    return _period.label;
+    final categoryLabel = _categoryNamesLabel(filter.categoryIds, categories);
+    if (categoryLabel != null) parts.add(categoryLabel);
+    return parts.join(' · ');
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final filter = ref.watch(expenseHistoryFilterProvider);
+    final categories = ref.watch(categoryControllerProvider).value ?? const [];
 
     return Scaffold(
       appBar: AppBar(title: const AppBarTitle('Search')),
@@ -215,20 +237,20 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 IconButton(
-                  icon: Badge(isLabelVisible: _hasDateFilter, smallSize: 8, child: const Icon(Icons.calendar_today_outlined)),
-                  tooltip: 'Pick a date range',
-                  onPressed: _pickPeriod,
+                  icon: Badge(isLabelVisible: filter.isActive, smallSize: 8, child: const Icon(Icons.tune)),
+                  tooltip: 'Filters',
+                  onPressed: _openFilters,
                 ),
               ],
             ),
           ),
-          if (_hasDateFilter)
+          if (filter.isActive)
             Padding(
               padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: InkWell(
-                  onTap: _pickPeriod,
+                  onTap: _openFilters,
                   borderRadius: BorderRadius.circular(999),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
@@ -240,14 +262,23 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.calendar_today, size: 14, color: colorScheme.primary),
+                        Icon(Icons.filter_alt, size: 14, color: colorScheme.primary),
                         const SizedBox(width: AppSpacing.xs),
-                        Text(
-                          _dateFilterLabel(),
-                          style: textTheme.labelLarge?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.w600),
+                        Flexible(
+                          child: Text(
+                            _filterSummary(filter, categories),
+                            style: textTheme.labelLarge?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(width: AppSpacing.xs),
-                        InkWell(onTap: _clearDateFilter, child: Icon(Icons.close, size: 14, color: colorScheme.primary)),
+                        InkWell(
+                          onTap: () {
+                            ref.read(expenseHistoryFilterProvider.notifier).set(const ExpenseHistoryFilter());
+                            _runSearch();
+                          },
+                          child: Icon(Icons.close, size: 14, color: colorScheme.primary),
+                        ),
                       ],
                     ),
                   ),
@@ -255,32 +286,34 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
               ),
             ),
           const SizedBox(height: AppSpacing.sm),
-          Expanded(child: _buildResults(context)),
+          Expanded(child: _buildResults(context, filter)),
         ],
       ),
     );
   }
 
-  Widget _buildResults(BuildContext context) {
+  Widget _buildResults(BuildContext context, ExpenseHistoryFilter filter) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (!_hasAnyFilter) {
+    if (!_hasQuery && !filter.isActive) {
       return const EmptyState(
         icon: Icons.search,
         title: 'Search your expenses',
-        subtitle: 'Type a description or amount, or pick a date range.',
+        subtitle: 'Type a description or amount, or use Filters to browse by category/date.',
       );
     }
 
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return Center(child: Text('Could not search: $_error'));
 
-    // Date-only: same grouped day-tile view as Home.
-    if (!_hasQuery) {
+    // Time-period-only (or no) filter: same grouped day-tile view as Home.
+    // A category filter or text query switches to the flat list below —
+    // see _wantsFlatList.
+    if (!_wantsFlatList(filter)) {
       final days = _dailyResult?.days ?? const [];
       if (days.isEmpty) {
-        return const EmptyState(icon: Icons.receipt_long_outlined, title: 'Nothing logged for this period');
+        return const EmptyState(icon: Icons.receipt_long_outlined, title: 'Nothing logged for this filter');
       }
       return ListView(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
@@ -288,16 +321,22 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
           for (final day in days)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: DayTile(key: ValueKey(day.date.toIso8601String()), summary: day),
+              child: DayTile(
+                key: ValueKey(day.date.toIso8601String()),
+                summary: day,
+                categoryIds: filter.categoryIds,
+                onExpenseChanged: _runSearch,
+              ),
             ),
         ],
       );
     }
 
-    // Text query: a flat list of matches, not grouped by day.
+    // Category filter and/or text query: a flat list of matches, not
+    // grouped by day.
     final items = _listResult?.items ?? const [];
     if (items.isEmpty) {
-      return const EmptyState(icon: Icons.search_off, title: 'No matching expenses', subtitle: 'Try a different search or date range.');
+      return const EmptyState(icon: Icons.search_off, title: 'No matching expenses', subtitle: 'Try a different search or filter.');
     }
 
     return ListView.builder(
@@ -315,7 +354,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
               child: Icon(Icons.delete_outline, color: colorScheme.error),
             ),
             onDismissed: (_) => _deleteExpense(expense.id),
-            child: ExpenseTile(expense: expense, onTap: () => showExpenseFormSheet(context, existing: expense)),
+            child: ExpenseTile(expense: expense, onTap: () => _editExpense(expense)),
           );
         }
 
@@ -341,134 +380,6 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-/// Date-only period picker — the same [HistoryPeriodPreset] chips as the
-/// History screen's Filters sheet, minus the category section (this screen
-/// has its own separate text-search field for that kind of narrowing).
-class _PeriodPickerSheet extends StatefulWidget {
-  final HistoryPeriodPreset current;
-  final DateTime? currentFrom;
-  final DateTime? currentTo;
-
-  const _PeriodPickerSheet({required this.current, required this.currentFrom, required this.currentTo});
-
-  @override
-  State<_PeriodPickerSheet> createState() => _PeriodPickerSheetState();
-}
-
-class _PeriodPickerSheetState extends State<_PeriodPickerSheet> {
-  late HistoryPeriodPreset _period = widget.current;
-  DateTime? _customFrom;
-  DateTime? _customTo;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.current == HistoryPeriodPreset.custom) {
-      _customFrom = widget.currentFrom;
-      _customTo = widget.currentTo;
-    }
-  }
-
-  Future<void> _pickCustomRange() async {
-    final now = DateTime.now();
-    final initial = (_customFrom != null && _customTo != null)
-        ? DateTimeRange(start: _customFrom!, end: _customTo!.subtract(const Duration(days: 1)))
-        : DateTimeRange(start: now.subtract(const Duration(days: 7)), end: now);
-
-    final picked = await pickFriendlyDateRange(
-      context,
-      firstDate: DateTime(now.year - 5),
-      lastDate: now,
-      initial: initial,
-    );
-    if (picked == null || !mounted) return;
-
-    setState(() {
-      _period = HistoryPeriodPreset.custom;
-      _customFrom = DateTime(picked.start.year, picked.start.month, picked.start.day);
-      _customTo = DateTime(picked.end.year, picked.end.month, picked.end.day).add(const Duration(days: 1));
-    });
-  }
-
-  void _apply() {
-    final (from, to) = switch (_period) {
-      HistoryPeriodPreset.custom => (_customFrom, _customTo),
-      HistoryPeriodPreset.all => (null, null),
-      _ => ExpenseHistoryFilter.rangeFor(_period) ?? (null, null),
-    };
-    Navigator.of(context).pop((_period, from, to));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Date range', style: textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.lg),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                children: [
-                  for (final preset in HistoryPeriodPreset.values)
-                    ChoiceChip(
-                      label: Text(preset.label),
-                      selected: _period == preset,
-                      onSelected: (_) {
-                        if (preset == HistoryPeriodPreset.custom) {
-                          _pickCustomRange();
-                        } else {
-                          setState(() => _period = preset);
-                        }
-                      },
-                    ),
-                ],
-              ),
-              if (_period == HistoryPeriodPreset.custom && _customFrom != null && _customTo != null) ...[
-                const SizedBox(height: AppSpacing.sm),
-                OutlinedButton.icon(
-                  onPressed: _pickCustomRange,
-                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                  label: Text(
-                    '${Formatters.dayMonthYear(_customFrom!)} – '
-                    '${Formatters.dayMonthYear(_customTo!.subtract(const Duration(days: 1)))}',
-                  ),
-                ),
-              ],
-              const SizedBox(height: AppSpacing.xl),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop((HistoryPeriodPreset.all, null, null)),
-                    child: const Text('Clear'),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _apply,
-                      style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary, foregroundColor: colorScheme.onPrimary),
-                      child: const Text('Apply'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

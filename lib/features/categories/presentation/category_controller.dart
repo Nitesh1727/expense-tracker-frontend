@@ -42,7 +42,6 @@ class CategoryController extends AsyncNotifier<List<Category>> {
       ref.refresh(homeSummaryProvider.future),
       ref.refresh(analyticsSummaryProvider.future),
     ]);
-    ref.invalidate(expenseHistoryControllerProvider);
   }
 }
 

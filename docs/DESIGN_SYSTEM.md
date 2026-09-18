@@ -201,9 +201,12 @@ something reached constantly like the 3 tabs are.
    as
    collapsible day-tiles (closed by default, showing date + total; tap to
    expand and lazily load that day's items), paginated by day as you scroll.
-   The filter icon opens the full expense history/log screen (category
-   filter, edit, delete) — a pushed route, not its own tab, since it's a
-   drill-down of Home rather than a separate concern.
+   The search icon opens the Search screen (a pushed route, not its own tab,
+   since it's a drill-down of Home rather than a separate concern) — text
+   search by description/amount, plus a Filters button for category
+   (multi-select) and time period, including custom ranges. Used to be two
+   separate icons/screens (Search and Filter) doing almost the same thing;
+   merged into one per explicit user feedback. See "Component notes" below.
 2. **Analytics** — period selector (Day/Week/Month/Year) with prev/next
    navigation and a clear "which period" label, total in an `AmountTile`,
    category breakdown list, CSV export (scoped to whatever period is showing,
@@ -225,8 +228,8 @@ something reached constantly like the 3 tabs are.
 - **Analytics**: period selector as a segmented control (Day/Week/Month/Year),
   total as the largest element on screen (`displayLarge`), category breakdown
   as a simple horizontal bar list or donut chart (`fl_chart`) below it.
-- **Custom date range picking** (History's Filters sheet, Search's date
-  filter, Analytics' custom-range CSV export) uses `pickFriendlyDateRange`
+- **Custom date range picking** (Search's Filters sheet, Analytics'
+  custom-range CSV export) uses `pickFriendlyDateRange`
   (`core/utils/friendly_date_range_picker.dart`) — a custom two-step dialog
   (start date, then end date, each a `CalendarDatePicker`, the same widget
   `showDatePicker` uses internally), not Flutter's built-in
@@ -242,16 +245,31 @@ something reached constantly like the 3 tabs are.
   mind mid-flow, not just restart. Built as one dialog with internal step
   state rather than two independent `showDatePicker` calls specifically to
   make that Back button possible.
-- **History's Filters sheet category picker is multi-select** (`FilterChip`,
+- **Search's Filters sheet category picker is multi-select** (`FilterChip`,
   not `ChoiceChip`) — pick any number of categories, not just one or all.
   "All" is its own chip that clears the whole selection rather than being
-  one more toggle among many. The backend's `GET /expenses` gained a
-  `categoryIds` query param (comma-separated, matched with `$in`) alongside
-  the existing singular `categoryId`, which other call sites (e.g. DayTile's
-  per-day fetch) still use unchanged.
-- **`HistoryPeriodPreset`** (the quick period chips shared by History's
-  Filters sheet and Search's date filter — see `expense_history_filter.dart`)
-  includes **Last month** alongside All time/Today/This week/This month/
-  Custom, added per explicit request as "the most commonly used" period
-  beyond the current one. Adding a case to that one enum is enough for it to
-  appear everywhere the preset chips are used, by construction.
+  one more toggle among many. The backend's `GET /expenses` and
+  `GET /expenses/daily-summary` both gained a `categoryIds` query param
+  (comma-separated, matched with `$in`) alongside the existing singular
+  `categoryId`, which other call sites (e.g. DayTile's per-day fetch) still
+  use unchanged.
+- **`HistoryPeriodPreset`** (the quick period chips in Search's Filters
+  sheet — see `expense_history_filter.dart`) includes **Last month**
+  alongside All time/Today/This week/This month/Custom, added per explicit
+  request as "the most commonly used" period beyond the current one. Adding
+  a case to that one enum is enough for it to appear wherever the preset
+  chips are used, by construction.
+- **Search screen** (`ExpenseSearchScreen`) is Home's sole entry point for
+  browsing/filtering/searching expenses — it used to be two separate
+  screens (a Search screen with only a date filter, and a History screen
+  with category+period filters), each with its own icon on Home, doing
+  almost the same thing. Merged per explicit user feedback. The category+
+  period Filters sheet (`ExpenseHistoryFilterSheet`) is reused as-is inside
+  Search rather than duplicated; its state lives in
+  `expenseHistoryFilterProvider` so it works the same regardless of which
+  screen opens it. Results view: no text query shows the same grouped
+  day-tiles Home uses (reuses `DayTile` directly), scoped to whatever
+  category/period filter is active; a text query shows a flat list of
+  matches with a running total instead — see the screen's own doc comment
+  for why. Not paginated with "load more" — a deliberate scope choice,
+  search/filter results are typically a narrower slice of history already.

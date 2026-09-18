@@ -10,11 +10,15 @@ import '../../../categories/presentation/category_controller.dart';
 import '../../domain/expense_history_filter.dart';
 import '../expense_providers.dart';
 
-/// Category + time period filter for the full expense history — both
-/// compose together (not either/or). Edits happen on a local draft; nothing
-/// takes effect until "Apply" (or "Clear filters", which resets and applies
-/// immediately) — see ExpenseHistoryFilter for why the draft isn't just
-/// written straight to the provider on every tap.
+/// Category + time period filter, opened from the Search screen's Filters
+/// button — both compose together (not either/or), and both compose with
+/// Search's own text query too. Used to be its own separate "History"
+/// screen with its own Filter entry point from Home; merged into Search
+/// per explicit user feedback that the two screens did almost the same
+/// thing. Edits happen on a local draft; nothing takes effect until "Apply"
+/// (or "Clear filters", which resets and applies immediately) — see
+/// ExpenseHistoryFilter for why the draft isn't just written straight to
+/// the provider on every tap.
 Future<void> showExpenseHistoryFilterSheet(BuildContext context) {
   return showGlassBottomSheet(context, builder: (context) => const _ExpenseHistoryFilterSheet());
 }
@@ -103,7 +107,7 @@ class _ExpenseHistoryFilterSheetState extends ConsumerState<_ExpenseHistoryFilte
               Text('Filters', style: textTheme.titleLarge),
               const SizedBox(height: AppSpacing.lg),
               Text(
-                'Category (pick any number)',
+                'Category / Categories',
                 style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.sm),

@@ -6,7 +6,6 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/swipeable_amount_tile.dart';
 import '../../analytics/presentation/analytics_providers.dart';
-import 'expense_history_screen.dart';
 import 'expense_providers.dart';
 import 'expense_search_screen.dart';
 import 'widgets/day_tile.dart';
@@ -77,24 +76,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Recent', style: textTheme.titleLarge),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    tooltip: 'Search',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ExpenseSearchScreen()),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.tune),
-                    tooltip: 'Filter',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ExpenseHistoryScreen()),
-                    ),
-                  ),
-                ],
+              // Search and Filter used to be two separate entry points doing
+              // almost the same thing — merged into one (Search now has its
+              // own Filters button for category/period, see
+              // ExpenseSearchScreen) per explicit user feedback.
+              IconButton(
+                icon: const Icon(Icons.search),
+                tooltip: 'Search',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ExpenseSearchScreen()),
+                ),
               ),
             ],
           ),

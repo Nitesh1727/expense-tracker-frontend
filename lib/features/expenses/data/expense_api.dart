@@ -78,14 +78,22 @@ class ExpenseApi {
   }
 
   /// Powers Home's collapsible day-tiles — one entry per day with expenses,
-  /// paginated by day count. See backend/docs/API.md. [from]/[to] (optional)
-  /// scope the whole summary to a range — used by the Search screen's
-  /// date-only results view; Home's own call omits them for full history.
-  Future<DailySummaryResult> dailySummary({DateTime? from, DateTime? to, int page = 1, int limit = 15}) async {
+  /// paginated by day count. See backend/docs/API.md. [from]/[to]/
+  /// [categoryIds] (all optional) scope the whole summary — used by the
+  /// Search screen's grouped-by-day results view; Home's own call omits
+  /// them all for full history.
+  Future<DailySummaryResult> dailySummary({
+    DateTime? from,
+    DateTime? to,
+    List<String>? categoryIds,
+    int page = 1,
+    int limit = 15,
+  }) async {
     try {
       final res = await _client.dio.get('/expenses/daily-summary', queryParameters: {
         if (from != null) 'from': _toUtcIso(from),
         if (to != null) 'to': _toUtcIso(to),
+        if (categoryIds != null && categoryIds.isNotEmpty) 'categoryIds': categoryIds.join(','),
         'page': page,
         'limit': limit,
       });

@@ -15,8 +15,21 @@ import 'expense_tile.dart';
 /// even once someone has scrolled back through months of history.
 class DayTile extends ConsumerStatefulWidget {
   final DailySummary summary;
+  // Passed through to this tile's own per-day fetch when expanded — without
+  // this, a tile whose *outer* total was correctly computed under an active
+  // category filter (via getDailySummary) would still show *every* category's
+  // expenses once expanded, since the inner fetch had no idea a filter was
+  // active. Home never passes this (no category filter exists there).
+  final Set<String>? categoryIds;
+  // Called after the edit sheet closes for one of this tile's expenses.
+  // Home doesn't need this — a mutation there already refreshes
+  // homeFeedControllerProvider, which updates `summary` and triggers this
+  // tile's own didUpdateWidget-based refetch below. But a caller whose data
+  // isn't a reactive provider (e.g. the Search screen's locally-fetched
+  // results) has no other way to learn that this day's data just changed.
+  final VoidCallback? onExpenseChanged;
 
-  const DayTile({super.key, required this.summary});
+  const DayTile({super.key, required this.summary, this.categoryIds, this.onExpenseChanged});
 
   @override
   ConsumerState<DayTile> createState() => _DayTileState();
@@ -52,7 +65,12 @@ class _DayTileState extends ConsumerState<DayTile> {
     try {
       final from = widget.summary.date;
       final to = from.add(const Duration(days: 1));
-      final result = await ref.read(expenseApiProvider).list(from: from, to: to, limit: 100);
+      final result = await ref.read(expenseApiProvider).list(
+            from: from,
+            to: to,
+            categoryIds: widget.categoryIds?.toList(),
+            limit: 100,
+          );
       if (!mounted) return;
       setState(() {
         _items = result.items;
@@ -80,11 +98,21 @@ class _DayTileState extends ConsumerState<DayTile> {
     // expenses changed elsewhere, so the cache is stale — clear it, and if
     // currently expanded, refetch immediately rather than waiting for the
     // user to collapse/reopen the tile.
-    final changed = oldWidget.summary.count != widget.summary.count || oldWidget.summary.total != widget.summary.total;
-    if (changed) {
+    // Also covers the (unlikely but possible) case where a changed category
+    // filter happens to produce the exact same count/total for this day —
+    // count/total alone wouldn't detect that the filter itself changed.
+    final summaryChanged = oldWidget.summary.count != widget.summary.count || oldWidget.summary.total != widget.summary.total;
+    final categoryFilterChanged = !_setEquals(oldWidget.categoryIds, widget.categoryIds);
+    if (summaryChanged || categoryFilterChanged) {
       _items = null;
       if (_expanded) _fetchItems();
     }
+  }
+
+  bool _setEquals(Set<String>? a, Set<String>? b) {
+    final sa = a ?? const <String>{};
+    final sb = b ?? const <String>{};
+    return sa.length == sb.length && sa.every(sb.contains);
   }
 
   @override
@@ -165,7 +193,10 @@ class _DayTileState extends ConsumerState<DayTile> {
             ExpenseTile(
               expense: expense,
               showDate: false,
-              onTap: () => showExpenseFormSheet(context, existing: expense),
+              onTap: () async {
+                await showExpenseFormSheet(context, existing: expense);
+                widget.onExpenseChanged?.call();
+              },
             ),
         ],
       ),

@@ -38,60 +38,20 @@ class HomeFeedController extends AsyncNotifier<DailySummaryResult> {
 
 final homeFeedControllerProvider = AsyncNotifierProvider<HomeFeedController, DailySummaryResult>(HomeFeedController.new);
 
-/// History screen's active filter (category + time period, composed
-/// together). Lives in its own provider rather than as field state on
-/// ExpenseHistoryController — that controller gets invalidated after every
-/// create/update/delete (see ExpenseMutationController below), which
-/// recreates the instance and would otherwise silently drop the filter.
+/// The Search screen's active filter (category + time period, composed
+/// together — the search text box itself is separate, plain local state on
+/// that screen, not a provider). Lives in its own provider rather than as
+/// field state on the screen so it survives that screen being popped and
+/// reopened, and so ExpenseHistoryFilterSheet (opened from Search) can read/
+/// write it without a reference to the screen itself.
 final expenseHistoryFilterProvider = simpleValueProvider<ExpenseHistoryFilter>(const ExpenseHistoryFilter());
 
-/// Full expense history: paginated, optionally filtered by category and/or
-/// time period. Used by the "View all" drill-down from Home and wherever
-/// edit/delete needs the complete list, not just the last two weeks. When a
-/// period filter is active, pagination is naturally bounded to it — `from`/
-/// `to` scope every query (count, sum, and the page itself), so "load more"
-/// simply runs out once that period's data is exhausted.
-class ExpenseHistoryController extends AsyncNotifier<ExpenseListResult> {
-  @override
-  Future<ExpenseListResult> build() {
-    final filter = ref.watch(expenseHistoryFilterProvider);
-    return ref.read(expenseApiProvider).list(categoryIds: filter.categoryIds.toList(), from: filter.from, to: filter.to, page: 1);
-  }
-
-  Future<void> refresh() async {
-    final filter = ref.read(expenseHistoryFilterProvider);
-    state = await AsyncValue.guard(
-      () => ref.read(expenseApiProvider).list(categoryIds: filter.categoryIds.toList(), from: filter.from, to: filter.to, page: 1),
-    );
-  }
-
-  Future<void> loadMore() async {
-    final current = state.value;
-    if (current == null || !current.hasMore) return;
-
-    final filter = ref.read(expenseHistoryFilterProvider);
-    final next = await ref.read(expenseApiProvider).list(
-          categoryIds: filter.categoryIds.toList(),
-          from: filter.from,
-          to: filter.to,
-          page: current.page + 1,
-        );
-    state = AsyncData(ExpenseListResult(
-      items: [...current.items, ...next.items],
-      page: next.page,
-      limit: next.limit,
-      total: next.total,
-      totalAmount: next.totalAmount,
-    ));
-  }
-}
-
-final expenseHistoryControllerProvider =
-    AsyncNotifierProvider<ExpenseHistoryController, ExpenseListResult>(ExpenseHistoryController.new);
-
-/// Create/update/delete live here rather than on either list controller
-/// above, since a mutation needs to invalidate *both* the recent list and
-/// the history list (and analytics) — not just whichever screen triggered it.
+/// Create/update/delete live here rather than on any list controller, since
+/// a mutation needs to refresh *every* place a total could be showing (Home,
+/// Analytics) — not just whichever screen triggered it. The Search screen's
+/// own results aren't a provider (it fetches locally, since its results view
+/// shape depends on whether a text query is active) so it isn't refreshed
+/// from here — see ExpenseSearchScreen/DayTile's onExpenseChanged instead.
 class ExpenseMutationController extends Notifier<void> {
   @override
   void build() {}
@@ -127,9 +87,6 @@ class ExpenseMutationController extends Notifier<void> {
       ref.refresh(homeSummaryProvider.future),
       ref.refresh(analyticsSummaryProvider.future),
     ]);
-    // Not awaited: the history list isn't visible while a mutation sheet is
-    // open, so it just needs to be marked stale for whenever it's next shown.
-    ref.invalidate(expenseHistoryControllerProvider);
   }
 }
 
