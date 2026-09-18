@@ -167,23 +167,42 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   else
                     for (final entry in summary.byCategory) _CategoryBreakdownRow(entry: entry, total: summary.total),
                   const SizedBox(height: AppSpacing.xl),
-                  FilledButton.icon(
-                    // Defaults to whatever period is currently on screen
-                    // (the label above the total, e.g. "September 2026") —
-                    // "Choose a custom date range instead" below is where
-                    // that gets overridden, so the button itself doesn't
-                    // need to spell either behavior out in its own label.
-                    onPressed: _exporting
-                        ? null
-                        : () => _exportRange(
-                              from: summary.range.start,
-                              to: summary.range.end,
-                              label: Formatters.periodLabel(period, summary.range.start, summary.range.end),
-                            ),
-                    icon: _exporting
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.ios_share_outlined),
-                    label: Text(_exporting ? 'Exporting...' : 'Export Excel Sheet'),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FilledButton.icon(
+                        // Defaults to whatever period is currently on screen
+                        // (the label above the total, e.g. "September 2026")
+                        // — "Choose a custom date range instead" below is
+                        // where that gets overridden, so the button itself
+                        // doesn't need to spell either behavior out in its
+                        // own label; the info tooltip next to it does.
+                        onPressed: _exporting
+                            ? null
+                            : () => _exportRange(
+                                  from: summary.range.start,
+                                  to: summary.range.end,
+                                  label: Formatters.periodLabel(period, summary.range.start, summary.range.end),
+                                ),
+                        icon: _exporting
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.ios_share_outlined),
+                        label: Text(_exporting ? 'Exporting...' : 'Export Excel Sheet'),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Tooltip(
+                        message: 'Exports expenses for the period shown above '
+                            '(${Formatters.periodLabel(period, summary.range.start, summary.range.end)})',
+                        // Defaults to long-press on mobile, which isn't a
+                        // discoverable gesture on its own — a plain tap
+                        // reveals it immediately instead.
+                        triggerMode: TooltipTriggerMode.tap,
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xs),
+                          child: Icon(Icons.info_outline, size: 20, color: colorScheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Align(
