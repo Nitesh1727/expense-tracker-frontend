@@ -1,4 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Was only granted in the debug/profile manifest overlays (added by
+         the Flutter template for hot reload / VM service, not for the app's
+         own use) — every debug run of this project worked fine because of
+         that, but a release build merges only this main manifest, so it
+         shipped with no network permission at all. Every request silently
+         failed at the OS level ("could not reach the server") regardless of
+         the backend URL, DNS, or any client side timeout, caught only once
+         an actual release APK was tested. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="SpendWise"
         android:name="${applicationName}"
