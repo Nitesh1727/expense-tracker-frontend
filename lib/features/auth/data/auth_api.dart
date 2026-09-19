@@ -62,15 +62,67 @@ class AuthApi {
     }
   }
 
-  /// Used both for the optional post-signup "add your name" prompt and for
-  /// editing profile fields later from the Profile screen — same call.
-  Future<User> updateProfile({String? name, String? email}) async {
+  /// Used for editing profile fields (name, avatar) from the Profile
+  /// screen and the Settings screen's monthly-report toggle — same
+  /// partial-update call for both. No `email` param — an account's email
+  /// is fixed once set (it's the verified login identity), not something
+  /// this can change.
+  Future<User> updateProfile({String? name, String? avatar, bool? monthlyReportEnabled}) async {
     try {
       final res = await _client.dio.patch('/auth/me', data: {
         if (name != null) 'name': name,
-        if (email != null) 'email': email,
+        if (avatar != null) 'avatar': avatar,
+        if (monthlyReportEnabled != null) 'monthlyReportEnabled': monthlyReportEnabled,
       });
       return User.fromJson(res.data['user']);
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    try {
+      await _client.dio.post('/auth/password/change', data: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      });
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
+  Future<void> resendVerificationEmail() async {
+    try {
+      await _client.dio.post('/auth/verify-email/resend');
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
+  Future<User> verifyEmail(String code) async {
+    try {
+      final res = await _client.dio.post('/auth/verify-email', data: {'code': code});
+      return User.fromJson(res.data['user']);
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
+  /// Always succeeds from the caller's point of view (backend returns the
+  /// same generic response whether or not the email has an account — see
+  /// backend/docs/API.md) so this can't be used to check which emails are
+  /// registered.
+  Future<void> forgotPassword(String email) async {
+    try {
+      await _client.dio.post('/auth/password/forgot', data: {'email': email});
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
+  Future<void> resetPassword({required String email, required String code, required String newPassword}) async {
+    try {
+      await _client.dio.post('/auth/password/reset', data: {'email': email, 'code': code, 'newPassword': newPassword});
     } catch (e) {
       throw ApiClient.toApiException(e);
     }

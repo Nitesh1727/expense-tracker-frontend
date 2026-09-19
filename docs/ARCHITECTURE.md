@@ -106,21 +106,27 @@ plus a top-right avatar that pushes `ProfileScreen` — Profile is deliberately
 not a 4th tab, see `docs/DESIGN_SYSTEM.md`.
 
 **The auth flow's navigation depth matters and has already broken once.**
-`WelcomeScreen` is `AuthGate`'s content; phone login pushes
-`PhoneEntryScreen` then `OtpVerifyScreen` **on top of it** — two levels deep,
-not one. Email login only pushes `EmailAuthScreen` — one level deep. When
-`AuthController`'s state flips to logged-in, `AuthGate` swaps its content to
-`RootShell` *underneath* whichever of these screens is on top — invisibly,
-since that screen is still the active route. Every one of these screens must
-clear itself off the stack after a successful login/signup so the swapped-in
-`RootShell` becomes visible. **Use `Navigator.of(context).popUntil((route)
-=> route.isFirst)`, never a plain `pop()`** — a single `pop()` only removes
-one level, which is exactly what shipped originally and broke phone login:
+`WelcomeScreen` is `AuthGate`'s content; email login/signup pushes just
+`EmailAuthScreen` — one level deep — but the forgot-password flow pushes
+`ForgotPasswordScreen` then `ResetPasswordScreen` **on top of that** — three
+levels deep from the root. (A now-removed phone+OTP flow was the original
+two-levels-deep case this lesson was learned from — see git history / backend's
+still-intact `/auth/otp/*` routes.) When `AuthController`'s state flips to
+logged-in, `AuthGate` swaps its content to `RootShell` *underneath* whichever
+screen is on top — invisibly, since that screen is still the active route.
+Every screen that can end up stacked here must clear itself off after a
+successful login/signup so the swapped-in `RootShell` becomes visible (or,
+for `_logout`/`deleteAccount` on the *pushed, not-a-tab* `ProfileScreen`,
+after the auth state flips back to logged-out — same underlying issue,
+opposite direction). **Use `Navigator.of(context).popUntil((route) =>
+route.isFirst)`, never a plain `pop()`** — a single `pop()` only removes one
+level, which is exactly what shipped originally and broke phone login:
 verifying successfully appeared to loop back to "enter your phone number"
-forever, because popping `OtpVerifyScreen` only revealed `PhoneEntryScreen`
-still sitting above the (already-swapped) `RootShell`. `popUntil(isFirst)`
-is correct regardless of how many screens are stacked, so this can't
-silently regress again if a future screen gets inserted into either flow.
+forever, because popping the verify screen only revealed the phone-entry
+screen still sitting above the (already-swapped) `RootShell`.
+`popUntil(isFirst)` is correct regardless of how many screens are stacked,
+so this can't silently regress again if a future screen gets inserted into
+any of these flows.
 
 Every drill-down/sheet elsewhere (History, expense/category forms, Profile
 edit) uses plain `Navigator.push`/`showModalBottomSheet` — this depth

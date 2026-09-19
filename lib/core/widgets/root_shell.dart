@@ -10,6 +10,7 @@ import '../../features/expenses/presentation/widgets/expense_form_sheet.dart';
 import '../providers/value_notifier_provider.dart';
 import '../theme/app_motion.dart';
 import 'app_bar_title.dart';
+import 'avatar_glyph.dart';
 
 /// Shell for the 3 main tabs — see frontend/docs/DESIGN_SYSTEM.md
 /// "Navigation". Profile is deliberately not a 4th tab: it's a top-right
@@ -62,7 +63,6 @@ class _RootShellState extends ConsumerState<RootShell> {
     final index = ref.watch(rootTabIndexProvider);
     final user = ref.watch(authControllerProvider).value;
     final colorScheme = Theme.of(context).colorScheme;
-    final initial = (user?.name?.isNotEmpty ?? false) ? user!.name![0].toUpperCase() : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -75,9 +75,7 @@ class _RootShellState extends ConsumerState<RootShell> {
               child: CircleAvatar(
                 radius: 18,
                 backgroundColor: colorScheme.primary.withValues(alpha: 0.15),
-                child: initial != null
-                    ? Text(initial, style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700))
-                    : Icon(Icons.person_outline, color: colorScheme.primary, size: 20),
+                child: AvatarGlyph(avatar: user?.avatar, name: user?.name, size: 36, color: colorScheme.primary),
               ),
             ),
           ),

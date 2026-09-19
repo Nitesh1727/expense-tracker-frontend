@@ -18,6 +18,16 @@ Future<void> showExpenseFormSheet(BuildContext context, {Expense? existing}) {
   return showGlassBottomSheet(context, builder: (context) => _ExpenseFormSheet(existing: existing));
 }
 
+/// `toStringAsFixed(0)` alone would silently round a decimal amount (e.g.
+/// 45.50) down to "46"/"45" when pre-filling this field to edit an existing
+/// expense — caught live: saving without noticing the field had changed
+/// would overwrite the original amount with the rounded whole number. Only
+/// drops the decimal part when the amount actually is a whole number.
+String _formatAmountForInput(double amount) {
+  final fixed = amount.toStringAsFixed(2);
+  return fixed.endsWith('.00') ? fixed.substring(0, fixed.length - 3) : fixed;
+}
+
 class _ExpenseFormSheet extends ConsumerStatefulWidget {
   final Expense? existing;
 
@@ -32,7 +42,7 @@ class _ExpenseFormSheetState extends ConsumerState<_ExpenseFormSheet> {
   final _categoryFieldKey = GlobalKey<FormFieldState<String>>();
   final _amountFocusNode = FocusNode();
   late final _amountController = TextEditingController(
-    text: widget.existing != null ? widget.existing!.amount.toStringAsFixed(0) : '',
+    text: widget.existing != null ? _formatAmountForInput(widget.existing!.amount) : '',
   );
   late final _descriptionController = TextEditingController(text: widget.existing?.description ?? '');
   Category? _selectedCategory;

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_bar_title.dart';
+import '../../../core/widgets/avatar_glyph.dart';
 import '../../settings/presentation/settings_screen.dart';
 import 'auth_controller.dart';
 import 'widgets/edit_profile_sheet.dart';
@@ -18,7 +19,16 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _deleting = false;
 
-  Future<void> _logout() => ref.read(authControllerProvider.notifier).logout();
+  /// Profile is a *pushed* screen (not a tab of RootShell) — flipping the
+  /// auth state to logged-out swaps what AuthGate shows underneath, but
+  /// doesn't by itself pop *this* screen off the stack, so it stayed on
+  /// top hiding the swapped-in WelcomeScreen instead of visibly returning
+  /// to it. popUntil clears back to the root regardless of how deep this
+  /// screen was reached from.
+  Future<void> _logout() async {
+    await ref.read(authControllerProvider.notifier).logout();
+    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   Future<void> _deleteAccount() async {
     final confirmed = await showDialog<bool>(
@@ -41,6 +51,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _deleting = true);
     try {
       await ref.read(authControllerProvider.notifier).deleteAccount();
+      // Same reasoning as _logout — pop this pushed screen off so the
+      // swapped-in WelcomeScreen is actually visible.
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not delete account';
@@ -54,7 +67,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = ref.watch(authControllerProvider).value;
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final initial = (user?.name?.isNotEmpty ?? false) ? user!.name![0].toUpperCase() : '👋';
 
     return Scaffold(
       appBar: AppBar(title: const AppBarTitle('Profile')),
@@ -78,7 +90,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
                 alignment: Alignment.center,
-                child: Text(initial, style: textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+                child: AvatarGlyph(avatar: user?.avatar, name: user?.name, size: 64, color: Colors.white),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -104,9 +116,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Column(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.tune_outlined),
-                  title: const Text('Display settings'),
-                  subtitle: const Text('Text size and font'),
+                  leading: const Icon(Icons.settings_outlined),
+                  title: const Text('Settings'),
+                  subtitle: const Text('Display, notifications, and account'),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 ),
                 const Divider(height: 1),

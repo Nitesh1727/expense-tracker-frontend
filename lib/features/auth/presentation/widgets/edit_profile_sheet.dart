@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/constants/avatar_presets.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/glass_bottom_sheet.dart';
+import '../../../../core/widgets/picker_dot.dart';
 import '../../domain/user.dart';
 import '../auth_controller.dart';
 
-/// Same fields as the optional post-signup prompt (ProfilePromptScreen), but
-/// pre-filled and always shown when the user taps to edit — not skippable
-/// here since they're actively choosing to open it.
+/// Pre-filled name/avatar, shown when the user actively taps to edit their
+/// profile from the Profile screen. No email field — an account's email is
+/// fixed once set (it's the verified login identity, see
+/// backend/docs/ARCHITECTURE.md's auth flow), not something this edits.
 Future<void> showEditProfileSheet(BuildContext context, User user) {
   return showGlassBottomSheet(context, builder: (context) => _EditProfileSheet(user: user));
 }
@@ -26,7 +29,7 @@ class _EditProfileSheet extends ConsumerStatefulWidget {
 class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   final _formKey = GlobalKey<FormState>();
   late final _nameController = TextEditingController(text: widget.user.name ?? '');
-  late final _emailController = TextEditingController(text: widget.user.email ?? '');
+  late String? _avatar = widget.user.avatar;
   bool _saving = false;
   // Shown inline rather than via SnackBar — a SnackBar anchors to the
   // Scaffold *behind* this sheet, so it rendered invisible behind the
@@ -37,7 +40,6 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     super.dispose();
   }
 
@@ -47,12 +49,11 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
 
     setState(() => _saving = true);
     final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
 
     try {
       await ref.read(authControllerProvider.notifier).updateProfile(
             name: name.isNotEmpty ? name : null,
-            email: email.isNotEmpty ? email : null,
+            avatar: _avatar,
           );
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -95,17 +96,20 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                   maxLength: 50,
                   decoration: const InputDecoration(labelText: 'Name', hintText: 'e.g. Nitesh Yadav'),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email', hintText: 'you@example.com'),
-                  validator: (value) {
-                    final email = value?.trim() ?? '';
-                    if (email.isEmpty) return null;
-                    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) return 'Enter a valid email';
-                    return null;
-                  },
+                const SizedBox(height: AppSpacing.lg),
+                Text('Avatar', style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant)),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    for (final key in AvatarPresets.keys)
+                      PickerDot(
+                        selected: _avatar == key,
+                        onTap: () => setState(() => _avatar = key),
+                        child: ClipOval(child: Image.asset(AvatarPresets.assetFor(key), cacheWidth: 56, cacheHeight: 56)),
+                      ),
+                  ],
                 ),
                 if (_formError != null) ...[
                   const SizedBox(height: AppSpacing.md),

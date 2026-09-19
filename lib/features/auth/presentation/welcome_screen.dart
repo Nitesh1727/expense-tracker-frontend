@@ -3,11 +3,14 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import 'email_auth_screen.dart';
-import 'phone_entry_screen.dart';
 
-/// The signed-out landing screen — picks phone+OTP or email+password before
-/// committing to either flow. Both create the same shape of account (see
-/// backend/docs/ARCHITECTURE.md auth flow).
+/// The signed-out landing screen. Phone+OTP sign-in used to be offered
+/// alongside email+password here (see git history / backend's still-intact
+/// `/auth/otp/*` routes) — dropped from the UI "for now" per explicit user
+/// request, since real SMS delivery costs money at every provider and
+/// there's no free gateway to wire up yet. Re-adding it later is a frontend-
+/// only change: the backend OTP flow was left running, just unreachable
+/// from here.
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
@@ -34,21 +37,35 @@ class WelcomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // The app's real logo (assets/icon/app_icon.png — also the
+              // launcher icon, see pubspec.yaml's flutter_launcher_icons
+              // config) rather than a generic Material icon standing in for
+              // one. It's a full-bleed square with its own gradient baked
+              // in, so this just clips the corners and adds the same
+              // colored shadow the placeholder version had.
               Container(
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.7)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(color: colorScheme.primary.withValues(alpha: 0.35), blurRadius: 24, offset: const Offset(0, 10)),
                   ],
                 ),
-                child: const Icon(Icons.account_balance_wallet_rounded, size: 36, color: Colors.white),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  // The source PNG is 1024x1024 (it doubles as the launcher
+                  // icon) but only ever renders at 72x72 here — without
+                  // cacheWidth/Height, Flutter decodes the full-resolution
+                  // bitmap into memory (~4MB) and downscales it on every
+                  // paint, instead of decoding once at roughly the size it's
+                  // actually shown at.
+                  child: Image.asset(
+                    'assets/icon/app_icon.png',
+                    cacheWidth: (72 * MediaQuery.of(context).devicePixelRatio).round(),
+                    cacheHeight: (72 * MediaQuery.of(context).devicePixelRatio).round(),
+                  ),
+                ),
               ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8)),
               const SizedBox(height: AppSpacing.lg),
               // displayLarge's size, but opted into the heading serif — AppTheme
@@ -66,24 +83,11 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xxl),
               ElevatedButton.icon(
                 onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const PhoneEntryScreen()),
-                ),
-                icon: const Icon(Icons.phone_outlined),
-                label: const Text('Continue with phone'),
-              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
-              const SizedBox(height: AppSpacing.sm),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const EmailAuthScreen()),
                 ),
                 icon: const Icon(Icons.email_outlined),
                 label: const Text('Continue with email'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                  side: BorderSide(color: colorScheme.outline),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ).animate().fadeIn(delay: 250.ms).slideY(begin: 0.1, end: 0),
+              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
             ],
               ),
             ),

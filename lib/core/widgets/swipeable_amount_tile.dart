@@ -145,9 +145,20 @@ class _SwipeableAmountTileState<T> extends State<SwipeableAmountTile<T>> {
               } else if (index != _page) {
                 distance = 1.0;
               }
-              return Opacity(
-                opacity: 1 - (distance * 0.4),
-                child: Transform.scale(scale: 1 - (distance * 0.08), child: child),
+              // RepaintBoundary — this Opacity wraps a gradient+shadow
+              // Container, which the engine can't cheaply fade (it has to
+              // rasterize the whole card to an offscreen layer to blend its
+              // alpha), and it's recomputed on every animation frame while
+              // swiping. Without this boundary, that per-frame cost isn't
+              // just contained to this small card — it can force a repaint
+              // of everything else sharing its layer too. Pre-existing
+              // pattern, not new; this only isolates its cost, no visual
+              // change.
+              return RepaintBoundary(
+                child: Opacity(
+                  opacity: 1 - (distance * 0.4),
+                  child: Transform.scale(scale: 1 - (distance * 0.08), child: child),
+                ),
               );
             },
             child: _HeroAmountCard(label: label, amountText: widget.amountFor(value)),

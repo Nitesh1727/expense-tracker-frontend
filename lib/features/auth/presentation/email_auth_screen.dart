@@ -5,6 +5,8 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import 'auth_controller.dart';
+import 'forgot_password_screen.dart';
+import 'widgets/verify_email_dialog.dart';
 
 /// Sign up and log in share one screen with a toggle — same fields layout,
 /// only the name field and the submit label differ, so a separate route per
@@ -21,7 +23,9 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isSignup = true;
+  // Defaults to login, not signup — most taps on "Continue with email" are
+  // an existing user coming back, not someone creating a new account.
+  bool _isSignup = false;
   bool _submitting = false;
   bool _obscurePassword = true;
 
@@ -51,16 +55,22 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
       if (_isSignup) {
         final name = _nameController.text.trim();
         await notifier.signupEmail(email: email, password: password, name: name.isNotEmpty ? name : null);
+        // Verification only ever comes up right here, at account creation —
+        // there's deliberately no lingering "verify your email" entry in
+        // Settings/Profile for it to live in later. Shown over this screen
+        // (not yet popped), so dismissing it (Cancel, or verifying) reveals
+        // Home right after, same as a plain login/signup would.
+        if (mounted) await showVerifyEmailDialog(context, ref);
       } else {
         await notifier.loginEmail(email: email, password: password);
       }
       // AuthController's state is now logged-in; AuthGate (lib/app.dart) swaps
       // its content to RootShell underneath this screen (pushed on top of it),
       // so pop to reveal it. popUntil(isFirst), not a plain pop() — this
-      // screen is currently only one level deep, but the phone flow made the
-      // same single-pop assumption and broke when WelcomeScreen added a
-      // level in front of it (see OtpVerifyScreen). popUntil is correct at
-      // any depth, so it can't silently break here the same way later.
+      // screen is currently only one level deep, but a similar single-pop
+      // assumption elsewhere (see ProfileScreen._logout) broke once a screen
+      // ended up pushed deeper than expected. popUntil is correct at any
+      // depth, so it can't silently break here the same way later.
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
@@ -133,6 +143,21 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
                   },
                   onFieldSubmitted: (_) => _submit(),
                 ),
+                if (!_isSignup) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.of(context).push(
+                                MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                              ),
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                      child: const Text('Forgot password?'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 AppButton(
                   label: _isSignup ? 'Create account' : 'Log in',

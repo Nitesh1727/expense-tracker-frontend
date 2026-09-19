@@ -101,10 +101,10 @@ backend DATABASE.md) use the same icon/color values listed there: Food
   font stays curated. `displayLarge`, `titleLarge`, and `titleMedium` are
   deliberately left in the body font since they're used for numbers
   (AmountTile totals, day-tile amounts) as well as text — numerals should
-  stay in the legible sans font regardless of heading treatment. Two call
-  sites that use a headline-level style for a genuinely numeric input (the
-  OTP code entry field, the amount field in the add/edit expense sheet)
-  explicitly opt back out to a sans style rather than inheriting the serif.
+  stay in the legible sans font regardless of heading treatment. The amount
+  field in the add/edit expense sheet uses a headline-level style for a
+  genuinely numeric input and explicitly opts back out to a sans style
+  rather than inheriting the serif.
   See `AppTheme.headingStyle()` for the one-off case (the splash screen's
   "SpendWise" wordmark, which intentionally uses `displayLarge`'s size but
   wants the serif).
@@ -219,8 +219,50 @@ something reached constantly like the 3 tabs are.
    explicit user feedback ("keep this simple").
 3. **Categories** — list of the user's categories with CRUD (add/edit/delete).
 
-**Profile** (pushed, not a tab) — account info + edit, display settings
-(theme mode, text size, font), logout, delete account.
+**Profile** (pushed, not a tab) — account info + edit (name, email, avatar —
+see below), a single "Settings" row into the Settings hub, logout, delete
+account. Deliberately thin: anything that's an app *preference* rather than
+an account-identity action lives in Settings, not here.
+
+**Settings** — a hub screen (Apple Settings-style: categories that each
+drill into their own sub-screen), not one long flat page, specifically so
+it scales as more settings get added later without either this screen or
+Profile growing an ever-longer list:
+- **Display** → theme mode, accent color, text size, font (this used to be
+  the entirety of "Settings" — moved under its own category once
+  Notifications and Account needed somewhere to live too).
+- **Notifications** → the monthly email report toggle (see "Export &
+  Analytics" above for the report itself). Disabled, not hidden, for a
+  phone-only account (nothing to email a report to).
+- **Account** → "Change password" (proves ownership via the *current*
+  password, unlike the forgot-password flow's emailed code, since this one
+  assumes an active logged-in session). Disabled, not hidden, for a
+  phone-only account (no password to change).
+
+**Avatar** — a curated set of bundled cartoon illustrations
+(`assets/avatars/avatar_01.png`...`avatar_12.png`, sourced from DiceBear's
+open "avataaars" style), not an uploaded/free-form image — no upload/
+storage/moderation surface needed, same reasoning as category icons/colors
+being curated rather than free-form. The backend only ever stores/validates
+the *key* string (`core/constants/avatar_presets.dart` maps it to the actual
+asset path, mirroring `backend/src/constants/avatarPresets.js`'s
+`AVATAR_KEYS`) — never the image itself. Picked from Edit Profile's sheet
+(same picker-grid pattern as category icon/color pickers, showing each
+option's actual thumbnail). `AvatarGlyph` (`core/widgets/avatar_glyph.dart`)
+is the shared fallback logic — the chosen illustration if set, else the
+name's first letter, else a generic icon — used by both Profile's large
+gradient avatar and RootShell's small top-right one, which have different
+surrounding decoration but need the same "what goes inside" logic. Uses
+`cacheWidth`/`cacheHeight` when decoding (see WelcomeScreen's logo for why
+this matters — an oversized decode relative to the tiny display size is a
+real, measured source of jank, not just a style nit).
+
+**Email verification** only ever comes up once, immediately after email
+signup (a dialog shown right there — see EmailAuthScreen._submit) — there's
+deliberately no persistent "verify your email" entry in Settings/Profile for
+it to live in later. Skipping that one dialog (Cancel) just leaves the
+account unverified, per explicit product decision ("we will not verify
+everytime"); `emailVerified` is informational only, not a login gate.
 
 ## Component notes
 

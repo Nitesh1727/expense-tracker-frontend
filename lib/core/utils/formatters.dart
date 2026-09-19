@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 class Formatters {
   Formatters._();
 
-  static final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
+  static final _currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 2);
   static final _dayMonth = DateFormat('d MMM');
   static final _dayMonthYear = DateFormat('d MMM yyyy');
   static final _monthYear = DateFormat('MMM yyyy');
