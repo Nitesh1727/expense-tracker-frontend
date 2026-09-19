@@ -18,7 +18,13 @@ class ApiClient {
   /// dependency between the network layer and auth state).
   void Function()? onUnauthorized;
 
-  ApiClient() : dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl, connectTimeout: const Duration(seconds: 10))) {
+  // Render's free tier spins the backend down after ~15 minutes idle and
+  // can take 30-50s to wake back up on the next request — a 10s
+  // connectTimeout meant that first request after any gap failed with
+  // "could not reach the server" even though the backend was actually
+  // fine, just still starting up. 60s comfortably covers a cold start;
+  // once warm, real requests still return in well under a second.
+  ApiClient() : dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl, connectTimeout: const Duration(seconds: 60))) {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
