@@ -27,7 +27,20 @@ class ExpenseHistoryFilter {
   final DateTime? from;
   final DateTime? to; // exclusive, matching the API convention everywhere else
 
-  const ExpenseHistoryFilter({this.categoryIds = const {}, this.period = HistoryPeriodPreset.all, this.from, this.to});
+  // Whether the user explicitly picked the "All" / "All time" chips, as
+  // opposed to leaving that group with nothing chosen. Both mean "no filter"
+  // to the API — this only lets the sheet re-open showing what was picked.
+  final bool allCategories;
+  final bool allTime;
+
+  const ExpenseHistoryFilter({
+    this.categoryIds = const {},
+    this.period = HistoryPeriodPreset.all,
+    this.from,
+    this.to,
+    this.allCategories = false,
+    this.allTime = false,
+  });
 
   bool get isActive => categoryIds.isNotEmpty || period != HistoryPeriodPreset.all;
 
@@ -37,6 +50,8 @@ class ExpenseHistoryFilter {
         period: period ?? this.period,
         from: from ?? this.from,
         to: to ?? this.to,
+        allCategories: allCategories,
+        allTime: allTime,
       );
 
   /// Computes {from, to} for a named preset in local (device) time — the API
