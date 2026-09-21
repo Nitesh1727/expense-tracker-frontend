@@ -33,9 +33,10 @@ void main() {
     ));
 
     Future<void> settle() async {
-      await tester.pump(const Duration(milliseconds: 100)); // build the route so its fetch starts
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 500)));
-      await tester.pump(const Duration(milliseconds: 600));
+      // Route/sheet animations need a frame to finish and another to remove the route.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump(const Duration(milliseconds: 700));
     }
 
     bool sel(Type t, String label) {
@@ -45,6 +46,11 @@ void main() {
 
     Future<void> openSheet() async {
       await tester.tap(find.text('open'));
+      // Poll (in real time, for the SQLite fetch) until the categories render.
+      for (var i = 0; i < 50 && find.widgetWithText(FilterChip, 'Food').evaluate().isEmpty; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      }
       await settle();
     }
 
