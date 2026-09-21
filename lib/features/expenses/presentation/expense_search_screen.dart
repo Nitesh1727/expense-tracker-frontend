@@ -6,22 +6,31 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_bar_title.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../categories/domain/category.dart';
+import '../../categories/presentation/category_controller.dart';
 import '../data/expense_api.dart';
 import '../domain/expense.dart';
 import '../domain/expense_history_filter.dart';
 import 'expense_providers.dart';
 import 'widgets/day_tile.dart';
 import 'widgets/expense_form_sheet.dart';
+import 'widgets/expense_history_filter_sheet.dart';
 import 'widgets/expense_tile.dart';
-import 'widgets/search_filter_chips.dart';
 
-/// Search by description/amount, and/or category and time-period filters shown
-/// directly under the search box as chips ([SearchFilterChips]) that apply the
-/// instant they're tapped. Every chip can be switched off again, down to
-/// nothing selected at all; the filter itself lives in
-/// [expenseHistoryFilterProvider] so it survives the screen being popped and
-/// reopened. With no text and nothing selected there is nothing to search
-/// for, so the screen shows a prompt rather than silently listing everything.
+/// Search by description/amount, and/or a category/period Filters sheet —
+/// this used to be two separate entry points from Home (Search and Filter)
+/// doing almost the same thing; merged into one per explicit user feedback.
+/// The Filters sheet (category multi-select + time period, including
+/// custom range) is the exact same [showExpenseHistoryFilterSheet] widget,
+/// reused as-is rather than duplicated — its state lives in
+/// [expenseHistoryFilterProvider] so it round-trips correctly regardless of
+/// which screen opens the sheet. A sibling provider,
+/// [expenseFiltersEverAppliedProvider], tracks whether Apply has actually
+/// been pressed at least once — `filter.isActive` alone can't distinguish
+/// the untouched default state from an explicit "All categories, All time"
+/// choice, and those need to read differently (a "search your expenses"
+/// prompt vs. every expense, unfiltered) per explicit user feedback that
+/// pressing Apply on the untouched defaults appeared to do nothing.
 ///
 /// Two distinct results views — see [_wantsFlatList]:
 /// - **Time period only, or no filter at all**: the same grouped day-tiles
@@ -61,8 +70,6 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
   Timer? _debounce;
 
   String _query = '';
-  // Chips apply instantly, so searches can overlap; only the latest may land.
-  int _searchSeq = 0;
   bool _loading = false;
   String? _error;
   DailySummaryResult? _dailyResult;
@@ -129,8 +136,8 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
   /// pagination from the top is the only way to guarantee correctness.
   Future<void> _runSearch() async {
     final filter = ref.read(expenseHistoryFilterProvider);
-    final seq = ++_searchSeq;
-    if (!_hasQuery && !filter.isActive) {
+    final filtersApplied = ref.read(expenseFiltersEverAppliedProvider);
+    if (!_hasQuery && !filtersApplied) {
       setState(() {
         _dailyResult = null;
         _listResult = null;
@@ -153,7 +160,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
               to: filter.to,
               limit: _listPageSize,
             );
-        if (!mounted || seq != _searchSeq) return;
+        if (!mounted) return;
         setState(() {
           _listResult = result;
           _dailyResult = null;
@@ -166,7 +173,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
               to: filter.to,
               limit: _dailyPageSize,
             );
-        if (!mounted || seq != _searchSeq) return;
+        if (!mounted) return;
         setState(() {
           _dailyResult = result;
           _listResult = null;
@@ -174,7 +181,7 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
         });
       }
     } catch (e) {
-      if (!mounted || seq != _searchSeq) return;
+      if (!mounted) return;
       final message = e is ApiException ? e.message : 'Could not search';
       setState(() {
         _error = message;
@@ -250,6 +257,13 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     }
   }
 
+  Future<void> _openFilters() async {
+    final result = await showExpenseHistoryFilterSheet(context);
+    if (result == null) return; // dismissed without Apply or Clear — leave everything as-is
+    ref.read(expenseFiltersEverAppliedProvider.notifier).set(result); // true for Apply, false for Clear
+    _runSearch();
+  }
+
   Future<void> _editExpense(Expense expense) async {
     await showExpenseFormSheet(context, existing: expense);
     _runSearch();
@@ -266,9 +280,33 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
     }
   }
 
+  String? _categoryNamesLabel(Set<String> categoryIds, List<Category> categories) {
+    if (categoryIds.isEmpty) return null;
+    final names = categories.where((c) => categoryIds.contains(c.id)).map((c) => c.name).toList();
+    if (names.isEmpty) return null;
+    if (names.length <= 2) return names.join(', ');
+    return '${names.length} categories';
+  }
+
+  String _filterSummary(ExpenseHistoryFilter filter, List<Category> categories) {
+    final parts = <String>[];
+    if (filter.period == HistoryPeriodPreset.custom && filter.from != null && filter.to != null) {
+      parts.add('${Formatters.dayMonth(filter.from!)} – ${Formatters.dayMonth(filter.to!.subtract(const Duration(days: 1)))}');
+    } else if (filter.period != HistoryPeriodPreset.all) {
+      parts.add(filter.period.label);
+    }
+    final categoryLabel = _categoryNamesLabel(filter.categoryIds, categories);
+    if (categoryLabel != null) parts.add(categoryLabel);
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
     final filter = ref.watch(expenseHistoryFilterProvider);
+    final filtersApplied = ref.watch(expenseFiltersEverAppliedProvider);
+    final categories = ref.watch(categoryControllerProvider).value ?? const [];
 
     return Scaffold(
       appBar: AppBar(title: const AppBarTitle('Search')),
@@ -295,27 +333,73 @@ class _ExpenseSearchScreenState extends ConsumerState<ExpenseSearchScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(width: AppSpacing.sm),
+                IconButton(
+                  icon: Badge(isLabelVisible: filter.isActive, smallSize: 8, child: const Icon(Icons.tune)),
+                  tooltip: 'Filters',
+                  onPressed: _openFilters,
+                ),
               ],
             ),
           ),
+          if (filter.isActive)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: InkWell(
+                  onTap: _openFilters,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.filter_alt, size: 14, color: colorScheme.primary),
+                        const SizedBox(width: AppSpacing.xs),
+                        Flexible(
+                          child: Text(
+                            _filterSummary(filter, categories),
+                            style: textTheme.labelLarge?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        InkWell(
+                          onTap: () {
+                            ref.read(expenseHistoryFilterProvider.notifier).set(const ExpenseHistoryFilter());
+                            ref.read(expenseFiltersEverAppliedProvider.notifier).set(false);
+                            _runSearch();
+                          },
+                          child: Icon(Icons.close, size: 14, color: colorScheme.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: AppSpacing.sm),
-          SearchFilterChips(onChanged: _runSearch),
-          const SizedBox(height: AppSpacing.sm),
-          Expanded(child: _buildResults(context, filter)),
+          Expanded(child: _buildResults(context, filter, filtersApplied)),
         ],
       ),
     );
   }
 
-  Widget _buildResults(BuildContext context, ExpenseHistoryFilter filter) {
+  Widget _buildResults(BuildContext context, ExpenseHistoryFilter filter, bool filtersApplied) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (!_hasQuery && !filter.isActive) {
+    if (!_hasQuery && !filtersApplied) {
       return const EmptyState(
         icon: Icons.search,
         title: 'Search your expenses',
-        subtitle: 'Type a description or amount, or pick a category or time period.',
+        subtitle: 'Type a description or amount, or use Filters to browse by category/date.',
       );
     }
 

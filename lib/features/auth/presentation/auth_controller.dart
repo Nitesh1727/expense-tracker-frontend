@@ -110,6 +110,7 @@ class AuthController extends AsyncNotifier<User?> {
     ref.invalidate(homeFeedControllerProvider);
     ref.invalidate(categoryControllerProvider);
     ref.invalidate(expenseHistoryFilterProvider);
+    ref.invalidate(expenseFiltersEverAppliedProvider);
 
     try {
       final dir = await getTemporaryDirectory();
