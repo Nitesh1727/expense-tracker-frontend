@@ -4,8 +4,11 @@ import '../../../core/providers/value_notifier_provider.dart';
 import '../../analytics/presentation/analytics_providers.dart';
 import '../data/expense_api.dart';
 import '../domain/expense_history_filter.dart';
+import '../data/local_expense_api.dart';
+import '../../../core/config/app_config.dart';
 
-final expenseApiProvider = Provider<ExpenseApi>((ref) => ExpenseApi(ref.watch(apiClientProvider)));
+final expenseApiProvider = Provider<ExpenseApi>(
+    (ref) => AppConfig.isLocal ? LocalExpenseApi(ref.watch(localDatabaseProvider)) : RemoteExpenseApi(ref.watch(apiClientProvider)));
 
 /// Home screen's collapsible day-tile feed — paginated by number of days
 /// (not expenses), newest first. Each tile only carries its date/total/count

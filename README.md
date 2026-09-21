@@ -8,6 +8,11 @@ for color/typography/spacing/motion tokens — read that before building any
 UI. The root `../CLAUDE.md` and `../STATUS.md` (one level up) have the
 cross-project picture and current progress.
 
+## Data modes
+
+The same app runs against the backend (`cloud`, default) or fully offline on-device
+SQLite (`local`): `./run_dev.sh local`. See [docs/DATA_MODES.md](docs/DATA_MODES.md).
+
 ## Setup
 
 ```bash

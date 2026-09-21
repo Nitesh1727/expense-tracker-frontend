@@ -9,7 +9,7 @@
          an actual release APK was tested. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="SpendWise"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

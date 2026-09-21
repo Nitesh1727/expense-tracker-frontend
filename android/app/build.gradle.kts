@@ -29,6 +29,27 @@ android {
         versionName = flutter.versionName
     }
 
+    buildFeatures {
+        resValues = true
+    }
+
+    // One codebase, two data modes (see AppConfig.isLocal). The flavor only
+    // controls install identity; the mode itself comes from --dart-define.
+    // `cloud` keeps the original applicationId/label so it is the same app as
+    // before; `local` gets its own id so both can be installed side by side.
+    flavorDimensions += "mode"
+    productFlavors {
+        create("cloud") {
+            dimension = "mode"
+            resValue("string", "app_name", "SpendWise")
+        }
+        create("local") {
+            dimension = "mode"
+            applicationIdSuffix = ".local"
+            resValue("string", "app_name", "SpendWise Local")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

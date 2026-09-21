@@ -1,11 +1,17 @@
 import '../../../core/network/api_client.dart';
 import '../domain/analytics_summary.dart';
 
-class AnalyticsApi {
+abstract class AnalyticsApi {
+  Future<AnalyticsSummary> summary(String period, {DateTime? anchor});
+  Future<AnalyticsTrend> trend(String period, {DateTime? anchor});
+}
+
+class RemoteAnalyticsApi implements AnalyticsApi {
   final ApiClient _client;
 
-  AnalyticsApi(this._client);
+  RemoteAnalyticsApi(this._client);
 
+  @override
   Future<AnalyticsSummary> summary(String period, {DateTime? anchor}) async {
     try {
       final res = await _client.dio.get('/analytics/summary', queryParameters: {
@@ -18,6 +24,7 @@ class AnalyticsApi {
     }
   }
 
+  @override
   Future<AnalyticsTrend> trend(String period, {DateTime? anchor}) async {
     try {
       final res = await _client.dio.get('/analytics/trend', queryParameters: {

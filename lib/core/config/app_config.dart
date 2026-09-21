@@ -14,6 +14,16 @@ class AppConfig {
 
   static const _override = String.fromEnvironment('API_BASE_URL');
 
+  /// `--dart-define=DATA_MODE=cloud|local`. Cloud (the default) talks to the
+  /// Node/MongoDB backend; local keeps everything in on-device SQLite and
+  /// never touches the network. Compile-time, so one build is one mode.
+  static const _dataMode = String.fromEnvironment('DATA_MODE', defaultValue: 'cloud');
+
+  static bool get isLocal {
+    assert(_dataMode == 'cloud' || _dataMode == 'local', 'DATA_MODE must be cloud or local, got "$_dataMode"');
+    return _dataMode == 'local';
+  }
+
   static String get apiBaseUrl {
     if (_override.isNotEmpty) return _override;
     if (!kIsWeb && Platform.isAndroid) {

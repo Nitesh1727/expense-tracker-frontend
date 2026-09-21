@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_bar_title.dart';
 import 'account_settings_screen.dart';
@@ -31,6 +32,9 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () =>
                       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DisplaySettingsScreen())),
                 ),
+                // Monthly email reports and change-password only make sense with
+                // an emailed account, which local mode doesn't have.
+                if (!AppConfig.isLocal) ...[
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.notifications_outlined),
@@ -49,6 +53,7 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () =>
                       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountSettingsScreen())),
                 ),
+                ],
               ],
             ),
           ),

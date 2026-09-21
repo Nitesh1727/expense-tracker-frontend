@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Local mode is fully offline: dropping the permission makes Android
+         itself block any network access rather than relying on code alone.
+         (Debug builds re-add it for hot reload; release builds do not.) -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+</manifest>

@@ -4,8 +4,11 @@ import '../../analytics/presentation/analytics_providers.dart';
 import '../../expenses/presentation/expense_providers.dart';
 import '../data/category_api.dart';
 import '../domain/category.dart';
+import '../data/local_category_api.dart';
+import '../../../core/config/app_config.dart';
 
-final categoryApiProvider = Provider<CategoryApi>((ref) => CategoryApi(ref.watch(apiClientProvider)));
+final categoryApiProvider = Provider<CategoryApi>(
+    (ref) => AppConfig.isLocal ? LocalCategoryApi(ref.watch(localDatabaseProvider)) : RemoteCategoryApi(ref.watch(apiClientProvider)));
 
 class CategoryController extends AsyncNotifier<List<Category>> {
   @override

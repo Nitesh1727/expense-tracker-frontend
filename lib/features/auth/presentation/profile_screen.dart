@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_bar_title.dart';
@@ -30,17 +31,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
+  // Local mode has no account to delete — the same slot erases the on-device
+  // data instead, worded so it can't be mistaken for anything milder.
+  static final _local = AppConfig.isLocal;
+
   Future<void> _deleteAccount() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete account?'),
-        content: const Text('This permanently deletes your account and every expense you\'ve logged. This cannot be undone.'),
+        title: Text(_local ? 'Erase all data?' : 'Delete account?'),
+        content: Text(_local
+            ? 'This permanently erases every expense and custom category on this device and resets your profile. This cannot be undone.'
+            : 'This permanently deletes your account and every expense you\'ve logged. This cannot be undone.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text(_local ? 'Erase' : 'Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -52,11 +59,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       await ref.read(authControllerProvider.notifier).deleteAccount();
       // Same reasoning as _logout — pop this pushed screen off so the
-      // swapped-in WelcomeScreen is actually visible.
+      // swapped-in WelcomeScreen is actually visible. (Local mode stays
+      // signed in, so there it just returns to the app.)
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
-      final message = e is ApiException ? e.message : 'Could not delete account';
+      final message = e is ApiException ? e.message : _local ? 'Could not erase data' : 'Could not delete account';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       setState(() => _deleting = false);
     }
@@ -118,15 +126,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.settings_outlined),
                   title: const Text('Settings'),
-                  subtitle: const Text('Display, notifications, and account'),
+                  subtitle: Text(_local ? 'Display' : 'Display, notifications, and account'),
                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: const Text('Log out'),
-                  onTap: _logout,
-                ),
+                if (!_local) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.logout),
+                    title: const Text('Log out'),
+                    onTap: _logout,
+                  ),
+                ],
               ],
             ),
           ).animate().fadeIn(delay: 80.ms).slideY(begin: 0.05, end: 0),
@@ -134,8 +144,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Card(
             child: ListTile(
               leading: Icon(Icons.delete_forever_outlined, color: colorScheme.error),
-              title: Text('Delete account', style: TextStyle(color: colorScheme.error)),
-              subtitle: const Text('Permanently deletes your account and data'),
+              title: Text(_local ? 'Erase all data' : 'Delete account', style: TextStyle(color: colorScheme.error)),
+              subtitle: Text(_local ? 'Permanently erases all data on this device' : 'Permanently deletes your account and data'),
               trailing: _deleting ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : null,
               onTap: _deleting ? null : _deleteAccount,
             ),

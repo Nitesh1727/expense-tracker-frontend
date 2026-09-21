@@ -4,8 +4,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/providers/core_providers.dart';
 import '../data/export_api.dart';
+import '../data/local_export_api.dart';
+import '../../../core/config/app_config.dart';
 
-final exportApiProvider = Provider<ExportApi>((ref) => ExportApi(ref.watch(apiClientProvider)));
+final exportApiProvider = Provider<ExportApi>(
+    (ref) => AppConfig.isLocal ? LocalExportApi(ref.watch(localDatabaseProvider)) : RemoteExportApi(ref.watch(apiClientProvider)));
 
 class ExportController extends Notifier<void> {
   @override

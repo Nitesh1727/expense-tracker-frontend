@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../analytics/presentation/analytics_providers.dart';
 import '../../categories/presentation/category_controller.dart';
 import '../../expenses/presentation/expense_providers.dart';
 import '../data/auth_api.dart';
+import '../data/local_profile_store.dart';
 import '../domain/user.dart';
 
 final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.watch(apiClientProvider)));
@@ -20,6 +23,9 @@ final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.watch(apiClientPr
 class AuthController extends AsyncNotifier<User?> {
   @override
   Future<User?> build() async {
+    // Local mode has no login — there is always a (device-only) profile.
+    if (AppConfig.isLocal) return LocalProfileStore.load();
+
     final token = await SecureStorage.readToken();
     if (token == null) return null;
 
@@ -52,6 +58,10 @@ class AuthController extends AsyncNotifier<User?> {
   }
 
   Future<void> updateProfile({String? name, String? avatar, bool? monthlyReportEnabled}) async {
+    if (AppConfig.isLocal) {
+      state = AsyncData(await LocalProfileStore.update(name: name, avatar: avatar));
+      return;
+    }
     final user =
         await ref.read(authApiProvider).updateProfile(name: name, avatar: avatar, monthlyReportEnabled: monthlyReportEnabled);
     state = AsyncData(user);
@@ -72,6 +82,16 @@ class AuthController extends AsyncNotifier<User?> {
   }
 
   Future<void> deleteAccount() async {
+    if (AppConfig.isLocal) {
+      // "Erase all data": stay in the app (there is no login to return to)
+      // with an empty, freshly seeded database and a blank profile.
+      await ref.read(localDatabaseProvider).eraseAll();
+      await _clearLocalCaches();
+      ref.invalidate(analyticsSummaryProvider);
+      ref.invalidate(homeSummaryProvider);
+      state = AsyncData(await LocalProfileStore.clear());
+      return;
+    }
     await ref.read(authApiProvider).deleteAccount();
     await SecureStorage.clearToken();
     await _clearLocalCaches();

@@ -141,6 +141,10 @@ the JWT from `secure_storage.dart` and attaches
 routes to the login screen (token expired/invalid) in one place, rather than
 handling that per-screen.
 
+## Data modes
+
+The data layer is four interfaces with cloud and local (SQLite) implementations, selected at build time — see `docs/DATA_MODES.md`. Dependencies added for it: `sqflite` (on-device SQLite), `path` (DB file path), `excel` (on-device xlsx writer); `sqflite_common_ffi` is dev-only for tests.
+
 ## Animation approach
 
 Favor Flutter's built-in implicit animations (`AnimatedContainer`,

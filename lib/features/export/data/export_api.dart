@@ -1,10 +1,16 @@
 import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 
-class ExportApi {
+abstract class ExportApi {
+  /// Returns the raw `.xlsx` bytes for the period the user is viewing;
+  /// [label] is the on-screen period label, reused as the sheet name.
+  Future<List<int>> downloadXlsx({DateTime? from, DateTime? to, String? label});
+}
+
+class RemoteExportApi implements ExportApi {
   final ApiClient _client;
 
-  ExportApi(this._client);
+  RemoteExportApi(this._client);
 
   /// Returns the raw `.xlsx` bytes — small enough (personal expense data)
   /// that there's no need to stream to disk directly from Dio. [from]/[to]
@@ -13,6 +19,7 @@ class ExportApi {
   /// unrelated all-time dump. [label] is the human period label already
   /// shown on-screen (e.g. "September 2026") — the backend reuses it
   /// verbatim as the workbook's sheet name.
+  @override
   Future<List<int>> downloadXlsx({DateTime? from, DateTime? to, String? label}) async {
     try {
       final res = await _client.dio.get<List<int>>(

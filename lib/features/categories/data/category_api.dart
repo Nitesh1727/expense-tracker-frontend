@@ -1,11 +1,19 @@
 import '../../../core/network/api_client.dart';
 import '../domain/category.dart';
 
-class CategoryApi {
+abstract class CategoryApi {
+  Future<List<Category>> list();
+  Future<Category> create({required String name, required String icon, required String color});
+  Future<Category> update(String id, {String? name, String? icon, String? color});
+  Future<void> delete(String id);
+}
+
+class RemoteCategoryApi implements CategoryApi {
   final ApiClient _client;
 
-  CategoryApi(this._client);
+  RemoteCategoryApi(this._client);
 
+  @override
   Future<List<Category>> list() async {
     try {
       final res = await _client.dio.get('/categories');
@@ -15,6 +23,7 @@ class CategoryApi {
     }
   }
 
+  @override
   Future<Category> create({required String name, required String icon, required String color}) async {
     try {
       final res = await _client.dio.post('/categories', data: {'name': name, 'icon': icon, 'color': color});
@@ -24,6 +33,7 @@ class CategoryApi {
     }
   }
 
+  @override
   Future<Category> update(String id, {String? name, String? icon, String? color}) async {
     try {
       final res = await _client.dio.put('/categories/$id', data: {
@@ -37,6 +47,7 @@ class CategoryApi {
     }
   }
 
+  @override
   Future<void> delete(String id) async {
     try {
       await _client.dio.delete('/categories/$id');

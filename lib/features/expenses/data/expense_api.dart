@@ -83,11 +83,52 @@ class DailySummaryResult {
 /// here so it can't recur from a call site forgetting `.toUtc()`.
 String _toUtcIso(DateTime date) => date.toUtc().toIso8601String();
 
-class ExpenseApi {
+/// The data-source contract the UI depends on. [RemoteExpenseApi] talks to
+/// the Node backend; a local SQLite implementation can satisfy the same
+/// contract so screens/providers never know which one they're using.
+abstract class ExpenseApi {
+  Future<ExpenseListResult> list({
+    DateTime? from,
+    DateTime? to,
+    String? categoryId,
+    List<String>? categoryIds,
+    String? q,
+    int page = 1,
+    int limit = 20,
+  });
+
+  Future<DailySummaryResult> dailySummary({
+    DateTime? from,
+    DateTime? to,
+    List<String>? categoryIds,
+    int page = 1,
+    int limit = 15,
+  });
+
+  Future<Expense> create({
+    required double amount,
+    required String description,
+    required String categoryId,
+    DateTime? date,
+  });
+
+  Future<Expense> update(
+    String id, {
+    double? amount,
+    String? description,
+    String? categoryId,
+    DateTime? date,
+  });
+
+  Future<void> delete(String id);
+}
+
+class RemoteExpenseApi implements ExpenseApi {
   final ApiClient _client;
 
-  ExpenseApi(this._client);
+  RemoteExpenseApi(this._client);
 
+  @override
   Future<ExpenseListResult> list({
     DateTime? from,
     DateTime? to,
@@ -124,6 +165,7 @@ class ExpenseApi {
   /// [categoryIds] (all optional) scope the whole summary — used by the
   /// Search screen's grouped-by-day results view; Home's own call omits
   /// them all for full history.
+  @override
   Future<DailySummaryResult> dailySummary({
     DateTime? from,
     DateTime? to,
@@ -151,6 +193,7 @@ class ExpenseApi {
     }
   }
 
+  @override
   Future<Expense> create({required double amount, required String description, required String categoryId, DateTime? date}) async {
     try {
       final res = await _client.dio.post('/expenses', data: {
@@ -165,6 +208,7 @@ class ExpenseApi {
     }
   }
 
+  @override
   Future<Expense> update(String id, {double? amount, String? description, String? categoryId, DateTime? date}) async {
     try {
       final res = await _client.dio.put('/expenses/$id', data: {
@@ -179,6 +223,7 @@ class ExpenseApi {
     }
   }
 
+  @override
   Future<void> delete(String id) async {
     try {
       await _client.dio.delete('/expenses/$id');

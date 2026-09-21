@@ -3,8 +3,11 @@ import '../../../core/providers/core_providers.dart';
 import '../../../core/providers/value_notifier_provider.dart';
 import '../data/analytics_api.dart';
 import '../domain/analytics_summary.dart';
+import '../data/local_analytics_api.dart';
+import '../../../core/config/app_config.dart';
 
-final analyticsApiProvider = Provider<AnalyticsApi>((ref) => AnalyticsApi(ref.watch(apiClientProvider)));
+final analyticsApiProvider = Provider<AnalyticsApi>(
+    (ref) => AppConfig.isLocal ? LocalAnalyticsApi(ref.watch(localDatabaseProvider)) : RemoteAnalyticsApi(ref.watch(apiClientProvider)));
 
 /// Selected period for the Analytics screen — Day/Week/Month/Year segmented control.
 final analyticsPeriodProvider = simpleValueProvider<String>('week');
