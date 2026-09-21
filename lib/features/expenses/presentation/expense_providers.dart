@@ -57,21 +57,8 @@ final homeFeedControllerProvider = AsyncNotifierProvider<HomeFeedController, Dai
 /// together — the search text box itself is separate, plain local state on
 /// that screen, not a provider). Lives in its own provider rather than as
 /// field state on the screen so it survives that screen being popped and
-/// reopened, and so ExpenseHistoryFilterSheet (opened from Search) can read/
-/// write it without a reference to the screen itself.
+/// reopened.
 final expenseHistoryFilterProvider = simpleValueProvider<ExpenseHistoryFilter>(const ExpenseHistoryFilter());
-
-/// Whether the Filters sheet has actually been applied at least once —
-/// distinct from `expenseHistoryFilterProvider.isActive`, which is false
-/// both for "never touched" *and* for an explicit "All categories, All
-/// time" choice. Those need to read differently (see ExpenseSearchScreen:
-/// the former shows a "search your expenses" prompt, the latter shows every
-/// expense, unfiltered) per explicit user feedback that pressing Apply on
-/// the untouched defaults did nothing. Lives in a provider rather than
-/// local screen state for the same reason expenseHistoryFilterProvider
-/// does — it needs to survive the Search screen being popped and reopened,
-/// not silently reset to "pristine" every time.
-final expenseFiltersEverAppliedProvider = simpleValueProvider<bool>(false);
 
 /// Create/update/delete live here rather than on any list controller, since
 /// a mutation needs to refresh *every* place a total could be showing (Home,
