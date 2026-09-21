@@ -31,13 +31,34 @@ class AuthApi {
     }
   }
 
-  Future<({User user, String token})> signupEmail({required String email, required String password, String? name}) async {
+  /// Step 1 of email signup — the backend stores a short-lived *pending*
+  /// signup and emails a code; no account (and no token) exists yet, so
+  /// this returns nothing. Throws if the email couldn't be sent, in which
+  /// case nothing was left behind server-side either.
+  Future<void> requestSignup({required String email, required String password, String? name}) async {
     try {
-      final res = await _client.dio.post('/auth/signup/email', data: {
+      await _client.dio.post('/auth/signup/email', data: {
         'email': email,
         'password': password,
         if (name != null && name.isNotEmpty) 'name': name,
       });
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
+  Future<void> resendSignupCode(String email) async {
+    try {
+      await _client.dio.post('/auth/signup/email/resend', data: {'email': email});
+    } catch (e) {
+      throw ApiClient.toApiException(e);
+    }
+  }
+
+  /// Step 2 — the correct code is what actually creates the account.
+  Future<({User user, String token})> verifySignup({required String email, required String code}) async {
+    try {
+      final res = await _client.dio.post('/auth/signup/email/verify', data: {'email': email, 'code': code});
       return (user: User.fromJson(res.data['user']), token: res.data['token'] as String);
     } catch (e) {
       throw ApiClient.toApiException(e);
@@ -86,23 +107,6 @@ class AuthApi {
         'currentPassword': currentPassword,
         'newPassword': newPassword,
       });
-    } catch (e) {
-      throw ApiClient.toApiException(e);
-    }
-  }
-
-  Future<void> resendVerificationEmail() async {
-    try {
-      await _client.dio.post('/auth/verify-email/resend');
-    } catch (e) {
-      throw ApiClient.toApiException(e);
-    }
-  }
-
-  Future<User> verifyEmail(String code) async {
-    try {
-      final res = await _client.dio.post('/auth/verify-email', data: {'code': code});
-      return User.fromJson(res.data['user']);
     } catch (e) {
       throw ApiClient.toApiException(e);
     }

@@ -6,7 +6,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_button.dart';
 import 'auth_controller.dart';
 import 'forgot_password_screen.dart';
-import 'widgets/verify_email_dialog.dart';
+import 'verify_signup_screen.dart';
 
 /// Sign up and log in share one screen with a toggle — same fields layout,
 /// only the name field and the submit label differ, so a separate route per
@@ -54,23 +54,22 @@ class _EmailAuthScreenState extends ConsumerState<EmailAuthScreen> {
     try {
       if (_isSignup) {
         final name = _nameController.text.trim();
-        await notifier.signupEmail(email: email, password: password, name: name.isNotEmpty ? name : null);
-        // Verification only ever comes up right here, at account creation —
-        // there's deliberately no lingering "verify your email" entry in
-        // Settings/Profile for it to live in later. Shown over this screen
-        // (not yet popped), so dismissing it (Cancel, or verifying) reveals
-        // Home right after, same as a plain login/signup would.
-        if (mounted) await showVerifyEmailDialog(context, ref);
-      } else {
-        await notifier.loginEmail(email: email, password: password);
+        // Sends the code but creates no account yet — that only happens once
+        // it's confirmed on the next screen, so there's nothing to skip past
+        // and nothing left behind if the email never arrives.
+        await notifier.requestSignup(email: email, password: password, name: name.isNotEmpty ? name : null);
+        if (mounted) {
+          await Navigator.of(context).push(MaterialPageRoute(builder: (_) => VerifySignupScreen(email: email)));
+        }
+        return;
       }
+
+      await notifier.loginEmail(email: email, password: password);
       // AuthController's state is now logged-in; AuthGate (lib/app.dart) swaps
       // its content to RootShell underneath this screen (pushed on top of it),
-      // so pop to reveal it. popUntil(isFirst), not a plain pop() — this
-      // screen is currently only one level deep, but a similar single-pop
-      // assumption elsewhere (see ProfileScreen._logout) broke once a screen
-      // ended up pushed deeper than expected. popUntil is correct at any
-      // depth, so it can't silently break here the same way later.
+      // so pop to reveal it. popUntil(isFirst), not a plain pop() — a single
+      // pop only removes one level, and screens stack deeper than one here
+      // (see ProfileScreen._logout for the same lesson in reverse).
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;

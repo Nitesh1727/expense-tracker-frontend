@@ -32,8 +32,15 @@ class AuthController extends AsyncNotifier<User?> {
     }
   }
 
-  Future<void> signupEmail({required String email, required String password, String? name}) async {
-    final result = await ref.read(authApiProvider).signupEmail(email: email, password: password, name: name);
+  /// Doesn't log anyone in — the account only exists once [verifySignup]
+  /// confirms the emailed code.
+  Future<void> requestSignup({required String email, required String password, String? name}) =>
+      ref.read(authApiProvider).requestSignup(email: email, password: password, name: name);
+
+  Future<void> resendSignupCode(String email) => ref.read(authApiProvider).resendSignupCode(email);
+
+  Future<void> verifySignup({required String email, required String code}) async {
+    final result = await ref.read(authApiProvider).verifySignup(email: email, code: code);
     await SecureStorage.saveToken(result.token);
     state = AsyncData(result.user);
   }
@@ -52,13 +59,6 @@ class AuthController extends AsyncNotifier<User?> {
 
   Future<void> changePassword({required String currentPassword, required String newPassword}) =>
       ref.read(authApiProvider).changePassword(currentPassword: currentPassword, newPassword: newPassword);
-
-  Future<void> resendVerificationEmail() => ref.read(authApiProvider).resendVerificationEmail();
-
-  Future<void> verifyEmail(String code) async {
-    final user = await ref.read(authApiProvider).verifyEmail(code);
-    state = AsyncData(user);
-  }
 
   Future<void> forgotPassword(String email) => ref.read(authApiProvider).forgotPassword(email);
 

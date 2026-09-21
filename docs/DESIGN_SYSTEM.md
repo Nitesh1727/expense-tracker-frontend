@@ -257,12 +257,13 @@ surrounding decoration but need the same "what goes inside" logic. Uses
 this matters — an oversized decode relative to the tiny display size is a
 real, measured source of jank, not just a style nit).
 
-**Email verification** only ever comes up once, immediately after email
-signup (a dialog shown right there — see EmailAuthScreen._submit) — there's
-deliberately no persistent "verify your email" entry in Settings/Profile for
-it to live in later. Skipping that one dialog (Cancel) just leaves the
-account unverified, per explicit product decision ("we will not verify
-everytime"); `emailVerified` is informational only, not a login gate.
+**Email verification is part of signup itself, not a follow-up.** Tapping
+"Create account" only emails a code and opens `VerifySignupScreen`; the account
+doesn't exist until that code is entered (which also logs the user in). So
+there's nothing to skip past by going back, nothing left behind if the email
+never arrives (the form shows the error and the same address can retry), and no
+"verify your email" entry anywhere in Settings/Profile — there's no unverified
+state to nag about.
 
 ## Component notes
 

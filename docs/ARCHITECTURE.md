@@ -107,7 +107,7 @@ not a 4th tab, see `docs/DESIGN_SYSTEM.md`.
 
 **The auth flow's navigation depth matters and has already broken once.**
 `WelcomeScreen` is `AuthGate`'s content; email login/signup pushes just
-`EmailAuthScreen` — one level deep — but the forgot-password flow pushes
+`EmailAuthScreen` — one level deep — while signup pushes `VerifySignupScreen` on top of it (two deep) and the forgot-password flow pushes
 `ForgotPasswordScreen` then `ResetPasswordScreen` **on top of that** — three
 levels deep from the root. (A now-removed phone+OTP flow was the original
 two-levels-deep case this lesson was learned from — see git history / backend's
