@@ -88,8 +88,30 @@ a font or weight, add the `Family-Weight.ttf` file (the same file
   styling) and a 50,000-row speed check.
 - `flutter test --dart-define=DATA_MODE=local`: also runs the local-mode app boot test.
 
+## Backup & Restore (local mode)
+
+Settings → Backup & Restore (hidden in cloud mode — its data already lives on
+the server). Local mode has no account and nothing auto-syncs, so this is the
+only way data survives losing or replacing the phone.
+
+- **Back up now**: `LocalDatabase.exportSnapshotTo` takes a consistent
+  snapshot with SQLite's `VACUUM INTO` (safe to call while the app keeps
+  using the live database — unlike copying the raw file, which could catch
+  it mid-write), then opens the OS share sheet (same pattern as Excel
+  export) so the user picks where it goes: Drive, Files, email, anywhere.
+- **Restore from backup**: a system file picker (`file_picker` — the only
+  way to let the user choose a file, including straight from a cloud
+  provider like Drive) selects a file; `LocalDatabase.restoreFromFile`
+  checks it's really a SpendWise database (opens it read-only, checks for
+  the expected tables) before touching anything, keeps a copy of the
+  current database until the new one is safely in place, and restores that
+  copy automatically if anything goes wrong partway through.
+- `test/local/backup_restore_test.dart` covers an export/restore round trip,
+  rejecting a non-backup file without losing existing data, and that the
+  backup file is independently valid SQLite.
+
 ## Not built yet
 
-- Backup/sync of the local database to Google Drive / iCloud (the single
-  `spendwise.db` file makes a backup/restore feature straightforward).
+- Automatic sync to Google Drive / iCloud (today it's a manual backup file,
+  by design — see above).
 - Moving data between cloud and local modes.

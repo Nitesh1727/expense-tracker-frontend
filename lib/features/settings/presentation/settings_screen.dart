@@ -3,6 +3,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/widgets/app_bar_title.dart';
 import 'account_settings_screen.dart';
+import 'backup_settings_screen.dart';
 import 'display_settings_screen.dart';
 import 'notification_settings_screen.dart';
 
@@ -53,6 +54,21 @@ class SettingsScreen extends StatelessWidget {
                   onTap: () =>
                       Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountSettingsScreen())),
                 ),
+                ],
+                // Local mode's data lives only on this device with no account
+                // behind it — this is the only way it survives losing the phone.
+                // Cloud mode's data already lives on the server, so this row
+                // doesn't apply there.
+                if (AppConfig.isLocal) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(Icons.backup_outlined),
+                    title: const Text('Backup & Restore'),
+                    subtitle: const Text('Save your data to a file, or restore from one'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () =>
+                        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BackupSettingsScreen())),
+                  ),
                 ],
               ],
             ),

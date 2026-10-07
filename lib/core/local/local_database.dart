@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
@@ -18,20 +19,35 @@ const _defaultCategories = [
 /// copying it.
 class LocalDatabase {
   final Future<Database> Function() _open;
+  // Only needed for restoreFromFile's validation step (opening an arbitrary
+  // *other* file read-only to check it's really a SpendWise backup before
+  // trusting it) — null in tests that never call restore. Separate from
+  // [_open] because that one always opens *this* database's own fixed path.
+  final Future<Database> Function(String path)? _openReadOnly;
   Future<Database>? _db;
 
-  LocalDatabase._(this._open);
+  LocalDatabase._(this._open, this._openReadOnly);
 
   /// The real on-device database.
-  factory LocalDatabase.onDevice() => LocalDatabase._(() async {
-        final dir = await getDatabasesPath();
-        return openDatabase(p.join(dir, 'spendwise.db'), version: 1, onCreate: createSchema);
-      });
+  factory LocalDatabase.onDevice() => LocalDatabase._(
+        () async {
+          final dir = await getDatabasesPath();
+          return openDatabase(p.join(dir, 'spendwise.db'), version: 1, onCreate: createSchema);
+        },
+        (path) => openDatabase(path, readOnly: true),
+      );
 
   /// For tests: any already-configured factory (e.g. an in-memory ffi DB).
-  factory LocalDatabase.withOpener(Future<Database> Function() open) => LocalDatabase._(open);
+  /// [openReadOnly] is only needed by tests that exercise [restoreFromFile].
+  factory LocalDatabase.withOpener(Future<Database> Function() open, {Future<Database> Function(String path)? openReadOnly}) =>
+      LocalDatabase._(open, openReadOnly);
 
   Future<Database> get instance => _db ??= _open();
+
+  /// The file on disk all local-mode data lives in — Android/iOS keep it in
+  /// app-private storage, invisible to a Files app, which is why backup/
+  /// restore below exist instead of pointing the user at a folder.
+  Future<String> get path async => (await instance).path;
 
   static Future<void> createSchema(Database db, int version) async {
     // name_key is the lowercased name: a UNIQUE column gives the same
@@ -76,6 +92,69 @@ class LocalDatabase {
         'color': color,
         'is_deletable': deletable ? 1 : 0,
       });
+    }
+  }
+
+  Future<void> close() async {
+    final pending = _db;
+    _db = null;
+    if (pending != null) await (await pending).close();
+  }
+
+  /// Writes a complete, consistent snapshot of the live database to
+  /// [destPath] using SQLite's own `VACUUM INTO` — safe to call while the
+  /// app keeps using the database (unlike copying the raw file, which could
+  /// catch it mid-write and copy a corrupt snapshot). This is the whole of
+  /// "back up my data": the resulting file is itself a valid SpendWise
+  /// database, openable by [restoreFromFile] on any device.
+  Future<void> exportSnapshotTo(String destPath) async {
+    final db = await instance;
+    if (await File(destPath).exists()) await File(destPath).delete();
+    // The destination is a fixed path this app generated (a temp file, or
+    // the picker's chosen name), never user-typed SQL — but VACUUM INTO
+    // doesn't accept a bound parameter for the filename, so it's quoted by
+    // hand with its single quotes escaped.
+    await db.execute("VACUUM INTO '${destPath.replaceAll("'", "''")}'");
+  }
+
+  /// Replaces all local data with the contents of [sourcePath] (a file
+  /// produced by [exportSnapshotTo]/a restore picked from Drive/Files). The
+  /// current database is backed up alongside itself first and restored if
+  /// anything below fails, so a bad or corrupt file can't leave the app
+  /// without a database.
+  Future<void> restoreFromFile(String sourcePath) async {
+    final openReadOnly = _openReadOnly;
+    if (openReadOnly == null) throw UnsupportedError('restoreFromFile needs openReadOnly');
+    await _assertIsSpendWiseBackup(sourcePath, openReadOnly);
+
+    final targetPath = await path;
+    await close();
+    final target = File(targetPath);
+    final safety = File('$targetPath.before-restore');
+    if (await target.exists()) await target.copy(safety.path);
+    try {
+      await File(sourcePath).copy(targetPath);
+    } catch (_) {
+      if (await safety.exists()) await safety.copy(targetPath);
+      rethrow;
+    } finally {
+      if (await safety.exists()) await safety.delete();
+    }
+  }
+
+  static Future<void> _assertIsSpendWiseBackup(String path, Future<Database> Function(String) openReadOnly) async {
+    Database? probe;
+    try {
+      probe = await openReadOnly(path);
+      final tables = await probe.query('sqlite_master', columns: ['name'], where: "type = 'table'");
+      final names = tables.map((t) => t['name']).toSet();
+      if (!names.containsAll(['categories', 'expenses'])) {
+        throw const FormatException("This doesn't look like a SpendWise backup file.");
+      }
+    } on DatabaseException {
+      throw const FormatException("This doesn't look like a SpendWise backup file.");
+    } finally {
+      await probe?.close();
     }
   }
 
