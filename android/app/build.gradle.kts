@@ -46,7 +46,10 @@ android {
         create("local") {
             dimension = "mode"
             applicationIdSuffix = ".local"
-            resValue("string", "app_name", "SpendWise Local")
+            // Same display name as cloud, by request — the two are told
+            // apart by their separate applicationId/icon on the home screen,
+            // not by the label.
+            resValue("string", "app_name", "SpendWise")
         }
     }
 
